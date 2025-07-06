@@ -1,7 +1,7 @@
 // _layout.tsx (adjust path for ThemeContext if needed)
 import React, { useMemo } from "react";
 import { Stack } from "expo-router";
-import { StatusBar } from "react-native";
+import { StatusBar, useColorScheme } from "react-native";
 import { MD3LightTheme, MD3DarkTheme, PaperProvider } from "react-native-paper";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 
@@ -14,13 +14,18 @@ export function RootLayout() {
     <Stack>
       <Stack.Screen
         name="index"
-        options={{ headerShown: false, animation: "fade" }}
+        options={{
+          headerShown: false,
+          // animation: "fade",
+          contentStyle: { backgroundColor: "#161626" },
+        }}
       />
       <Stack.Screen
         name="details"
         options={{
           headerShown: false,
-          animation: "fade",
+          animation: "flip",
+          contentStyle: { backgroundColor: "#161626" },
         }}
       />
     </Stack>
@@ -81,10 +86,13 @@ function AppContent() {
 // Default export: The main Layout component for this route segment
 export default function Layout() {
   return (
-    // Wrap the *entire app structure* within ThemeProvider
-    // GestureHandlerRootView should usually be near the root as well
     <ThemeProvider>
-      <GestureHandlerRootView style={{ flex: 1 }}>
+      <GestureHandlerRootView
+        style={{
+          flex: 1,
+          backgroundColor: "#000",
+        }}
+      >
         <AppContent />
       </GestureHandlerRootView>
     </ThemeProvider>

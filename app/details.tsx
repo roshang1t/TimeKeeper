@@ -1,10 +1,19 @@
-import { View, Text, StyleSheet, Alert, ActivityIndicator } from "react-native"; // Import ActivityIndicator
+import {
+  View,
+  Text,
+  StyleSheet,
+  Alert,
+  ActivityIndicator,
+  TouchableOpacity,
+} from "react-native"; // Import ActivityIndicator
 import React, { useEffect, useState, useRef, useCallback } from "react";
-import { useTheme } from "react-native-paper";
+import { Icon, useTheme } from "react-native-paper";
 import { LinearGradient } from "expo-linear-gradient";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useLocalSearchParams } from "expo-router";
 import { useFonts } from "expo-font";
+import { Pressable } from "react-native-gesture-handler";
+import EditModal from "@/components/edit.modal";
 
 export interface data {
   hours: string;
@@ -36,14 +45,16 @@ export default function Details() {
   // console.log("Fonts loaded! Rendering content."); // For debugging
 
   const theme = useTheme();
-  const { creation, name } = useLocalSearchParams<{
-    creation: string | string[];
+  const { creation, name, id } = useLocalSearchParams<{
+    creation: string;
     name: string;
+    id: string;
   }>();
   const createdAt = parseInt(Array.isArray(creation) ? creation[0] : creation);
 
   const [calculated, setCalculated] = useState<data | undefined>();
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
+  const [isVisible, setIsVisible] = useState<boolean>(false);
 
   const calculations = useCallback((creationTimestamp: number) => {
     const now = Date.now();
@@ -68,10 +79,10 @@ export default function Details() {
   }, []);
 
   useEffect(() => {
-    // 1. Perform initial calculation immediately
+    //  Perform initial calculation immediately
     calculations(createdAt);
 
-    // 2. Then set up the interval for subsequent updates
+    // Then set up the interval for subsequent updates
     intervalRef.current = setInterval(() => {
       calculations(createdAt);
     }, 1000);
@@ -86,7 +97,7 @@ export default function Details() {
 
   const createdAtDate = new Date(createdAt);
 
-  const formattedCreatedAt = createdAtDate.toLocaleDateString("en-US", {
+  const formattedCreatedAt = createdAtDate.toLocaleDateString("en-IN", {
     year: "numeric",
     month: "long",
     day: "numeric",
@@ -100,8 +111,13 @@ export default function Details() {
       style={styles.container}
     >
       <SafeAreaView style={styles.addgradient}>
-        <Text style={styles.gradientText}>Since {formattedCreatedAt}</Text>
-        <Text style={[styles.gradientText, { fontSize: 20 }]}>{name}</Text>
+        <View style={styles.topContainer}>
+          <Text style={styles.gradientText}>Since {formattedCreatedAt}</Text>
+          <Text style={[styles.gradientText, { fontSize: 20 }]}>
+            {name.substring(0, 12)}
+          </Text>
+        </View>
+
         <View style={styles.timeDisplay}>
           <View style={{ alignItems: "center" }}>
             <Text style={[styles.timeValue, { fontSize: 60 }]}>
@@ -134,6 +150,20 @@ export default function Details() {
             <Text style={styles.timeLabel}>Seconds</Text>
           </View>
         </View>
+
+        <TouchableOpacity onPress={() => setIsVisible(true)}>
+          <View style={styles.btnTxtWrapper}>
+            <Icon source="pencil" size={18} color="#000" />
+            <Text style={styles.gradientText}>EDIT</Text>
+          </View>
+        </TouchableOpacity>
+        <EditModal
+          isVisible={isVisible}
+          onClose={() => setIsVisible(false)}
+          id={id}
+          cName={name}
+          cDate={formattedCreatedAt}
+        />
       </SafeAreaView>
     </LinearGradient>
   );
@@ -150,21 +180,27 @@ const styles = StyleSheet.create({
     alignItems: "center",
     backgroundColor: "#FF96A3", // Match your gradient background for a smoother transition
   },
+  topContainer: {
+    justifyContent: "center",
+    alignItems: "center",
+    height: 60,
+    marginTop: 20,
+  },
   addgradient: {
-    height: "100%",
+    height: "97%",
     width: "100%",
-    // justifyContent: "center",
     alignItems: "center",
   },
   gradientText: {
     color: "black",
-    fontFamily: "bung-ee", // Example of applying a specific font
+    fontFamily: "Roboto-Regular", // Example of applying a specific font
+    fontWeight: "bold",
   },
   timeDisplay: {
     flex: 1,
     alignItems: "center",
     flexDirection: "column",
-    // justifyContent: "center",
+    justifyContent: "flex-start",
   },
 
   timeValue: {
@@ -179,5 +215,17 @@ const styles = StyleSheet.create({
     // fontWeight: "100",
     fontFamily: "bung-ee", // Example of applying a specific font
     height: 40,
+  },
+  btnTxtWrapper: {
+    flexDirection: "row",
+    justifyContent: "center",
+    alignItems: "center",
+    // padding: 10,
+    // elevation: 2,
+    width: 102,
+    height: 50,
+    borderRadius: 15,
+    borderWidth: 2,
+    gap: 1,
   },
 });
