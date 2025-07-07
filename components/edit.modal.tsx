@@ -95,27 +95,22 @@ export default function EditModal({
     <Modal
       visible={isVisible}
       onRequestClose={onClose}
-      //   transparent
+      // transparent
       animationType="fade"
       statusBarTranslucent
     >
       {/* Outer View to act as a full-screen overlay */}
       <LinearGradient
         colors={["#FEC9CE", "#FF96A3"]}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 0, y: 1 }}
+        start={{ x: 1, y: 1 }}
+        end={{ x: 1, y: 0 }}
         style={styles.modalContentWrapper}
       >
         <KeyboardAvoidingView
           behavior={Platform.OS === "ios" ? "padding" : "height"} // 'height' is often more reliable than 'position' for Android
           style={styles.keyboardAvoidingContainer}
         >
-          <LinearGradient
-            colors={["#FEC9CE", "#FF96A3"]}
-            start={{ x: 0, y: 1 }}
-            end={{ x: 0, y: 1 }}
-            style={styles.container}
-          >
+          <View style={styles.container}>
             <View style={{ width: "80%" }}>
               <Text style={[styles.modalTitle, { color: "#000" }]}>
                 {cName}
@@ -157,15 +152,29 @@ export default function EditModal({
               />
             )}
 
-            <View style={{ flexDirection: "row", gap: 60, marginTop: 10 }}>
-              <Button onPress={() => onClose()}>
-                <Icon source="cancel" size={35} color="black" />
+            <View style={{ flexDirection: "row", gap: 50, marginTop: 25 }}>
+              <Button
+                mode="elevated"
+                elevation={2}
+                style={styles.modalButton}
+                labelStyle={styles.buttonLabel}
+                onPress={() => onClose()}
+              >
+                {/* <Icon source="cancel" size={35} color="black" /> */}
+                cancel
               </Button>
-              <Button onPress={() => editCounter(id)}>
-                <Icon source="check" size={35} color="black" />
+              <Button
+                mode="elevated"
+                elevation={2}
+                style={styles.modalButton}
+                labelStyle={styles.buttonLabel}
+                onPress={() => editCounter(id)}
+              >
+                {/* <Icon source="check" size={35} color="black" /> */}
+                Ok
               </Button>
             </View>
-          </LinearGradient>
+          </View>
         </KeyboardAvoidingView>
       </LinearGradient>
     </Modal>
@@ -193,7 +202,7 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     justifyContent: "center",
     alignItems: "center",
-    elevation: 20,
+    // elevation: 20,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.25,
@@ -212,5 +221,15 @@ const styles = StyleSheet.create({
     textAlign: "center",
     fontFamily: "Roboto-Bold",
     fontSize: 15,
+  },
+  modalButton: {
+    minWidth: 110,
+    borderRadius: 8,
+    backgroundColor: "#ff96a9",
+  },
+  buttonLabel: {
+    color: "#000",
+    fontSize: 15,
+    // fontFamily: "Roboto-Bold",
   },
 });

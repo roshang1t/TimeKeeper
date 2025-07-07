@@ -6,14 +6,13 @@ import {
   Alert,
   SafeAreaView,
   TouchableOpacity,
-  ActivityIndicator, // Added for loading state
-  Modal,
+  ActivityIndicator,
+  StyleProp,
+  // Added for loading state
 } from "react-native";
 import {
   useTheme,
   Text,
-  Button,
-  TextInput,
   IconButton,
   Appbar,
   SegmentedButtons,
@@ -23,13 +22,7 @@ import * as SplashScreen from "expo-splash-screen";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { LinearGradient } from "expo-linear-gradient";
 import { format } from "date-fns"; // For formatting the creation date
-import DateTimePicker, {
-  DateTimePickerEvent,
-  EvtTypes,
-} from "@react-native-community/datetimepicker";
-
 import { useThemeContext } from "@/context/ThemeContext";
-import Details from "./details";
 import { useRouter } from "expo-router";
 import AddModal from "@/components/add.modal";
 
@@ -43,6 +36,8 @@ export interface Counter {
   createdAt: number; // Timestamp (milliseconds since epoch) when created
   isArchived: boolean; // For Current/Past tabs
   hasNotification?: boolean; // Optional: for the bell icon
+  type: "countdown" | "countup";
+  completed: boolean;
 }
 
 // --- AsyncStorage Key ---
@@ -63,6 +58,7 @@ export default function Index() {
   const [tick, setTick] = useState(0); // State to force updates for elapsed time
   const [date, setDate] = useState<Date | undefined>(undefined);
   const [selectedCounter, setSelectedCounter] = useState<Counter>(counters[0]);
+  const [type, setType] = useState<"countdown" | "countup">("countup");
 
   useEffect(() => {
     const themesetter = async () => {
@@ -95,6 +91,8 @@ export default function Index() {
               createdAt: c.createdAt || Date.now(),
               isArchived: c.isArchived === true, // Ensure boolean
               hasNotification: c.hasNotification === true, // Ensure boolean
+              type: c.type || "countup",
+              completed: c.completed || false,
             })
           );
           setCounters(correctedCounters);
@@ -174,6 +172,7 @@ export default function Index() {
     // This line now correctly uses the picked date/time if 'date' has a value,
     // otherwise it falls back to the current time.
     const creationTime = date ? date.getTime() : Date.now();
+    console.log(date?.toDateString());
 
     const newCounter: Counter = {
       id: Date.now().toString(), // Consider a more robust ID like UUID
@@ -181,11 +180,14 @@ export default function Index() {
       createdAt: creationTime, // Use the determined time
       isArchived: false,
       hasNotification: false, // Default value
+      type: type,
+      completed: false,
     };
     setCounters((prevCounters) => [newCounter, ...prevCounters]);
     setNewCounterName("");
     setDate(undefined); // <-- Reset date state back to undefined after adding
     setIsModalVisible(false);
+    setType("countup");
   };
 
   const handleDeleteCounter = (id: string) => {
@@ -212,7 +214,7 @@ export default function Index() {
 
   const handleArchiveToggle = (id: string) => {
     const targetCounter = counters.find((c) => c.id === id);
-    if (!targetCounter) return;
+    if (!targetCounter || targetCounter.completed === true) return;
 
     const nextIsArchived = !targetCounter.isArchived;
     setCounters((prevCounters) =>
@@ -226,11 +228,92 @@ export default function Index() {
     );
   };
 
+  const handleComplete = (id: string) => {
+    const targetCounter = counters.find((c) => c.id === id);
+    if (!targetCounter) return;
+    setCounters((prevCounters) =>
+      prevCounters.map((counter) =>
+        counter.id === id && counter.completed === false
+          ? { ...counter, isArchived: true, completed: true }
+          : counter
+      )
+    );
+    Alert.alert(`"${targetCounter.name}" moved to ${"Past"}.`);
+  };
+
   const router = useRouter();
 
   const onClose = () => {
-    setIsModalVisible(false);
     setDate(undefined);
+    setIsModalVisible(false);
+  };
+
+  const calculateCountup = (elapsedMs: number, baseStyle: any) => {
+    const totalSeconds = Math.floor(elapsedMs / 1000);
+    const totalMinutes = Math.floor(totalSeconds / 60);
+    const totalHours = Math.floor(totalMinutes / 60);
+    const totalDays = Math.floor(totalHours / 24);
+
+    let displayValue: string | number;
+    let displayLabel: string;
+    let isDaysView = false;
+
+    if (totalDays > 0) {
+      displayValue = totalDays;
+      displayLabel = totalDays === 1 ? "DAY SINCE" : "DAYS SINCE";
+      isDaysView = true;
+      baseStyle = styles.daysNumber; // Switch to Days style
+    } else if (totalHours >= 1) {
+      displayValue = totalHours;
+      displayLabel = "HOURS SINCE";
+    } else if (totalMinutes >= 1) {
+      displayValue = totalMinutes;
+      displayLabel = "MINUTES SINCE";
+    } else {
+      displayValue = totalSeconds;
+      displayLabel = "SECONDS SINCE";
+    }
+
+    return {
+      displayLabel,
+      displayValue,
+      isDaysView,
+      remainingSeconds: 1,
+    };
+  };
+
+  const calculateCountdown = (forthcommingMs: number, baseStyle: any) => {
+    const remainingSeconds = Math.floor(forthcommingMs / 1000);
+    const remainingMinutes = Math.floor(remainingSeconds / 60);
+    const remainingHours = Math.floor(remainingMinutes / 60);
+    const remainingDays = Math.floor(remainingHours / 24);
+
+    let displayValue: string | number;
+    let displayLabel: string;
+    let isDaysView = false;
+
+    if (remainingDays > 0) {
+      displayValue = remainingDays;
+      displayLabel = remainingDays === 1 ? "DAY TO" : "DAYS TO";
+      isDaysView = true;
+      baseStyle = styles.daysNumber; // Switch to Days style
+    } else if (remainingHours >= 1) {
+      displayValue = remainingHours;
+      displayLabel = "HOURS TO";
+    } else if (remainingMinutes >= 1) {
+      displayValue = remainingMinutes;
+      displayLabel = "MINUTES TO";
+    } else {
+      displayValue = remainingSeconds;
+      displayLabel = "SECONDS TO";
+    }
+
+    return {
+      displayLabel,
+      displayValue,
+      isDaysView,
+      remainingSeconds,
+    };
   };
 
   // --- Render Item for FlatList ---
@@ -238,38 +321,29 @@ export default function Index() {
     ({ item }: { item: Counter }) => {
       const now = Date.now();
       const elapsedMs = Math.max(0, now - item.createdAt);
+      const forthcommingMs = Math.max(0, item.createdAt - now);
 
-      const totalSeconds = Math.floor(elapsedMs / 1000);
-      const totalMinutes = Math.floor(totalSeconds / 60);
-      const totalHours = Math.floor(totalMinutes / 60);
-      const totalDays = Math.floor(totalHours / 24);
-
-      let displayValue: string | number;
-      let displayLabel: string;
-      let isDaysView = false;
       let baseStyle = styles.hoursMinutesSecondsNumber; // Default to H/M/S style
 
-      if (totalDays > 0) {
-        displayValue = totalDays;
-        displayLabel = totalDays === 1 ? "DAY SINCE" : "DAYS SINCE";
-        isDaysView = true;
-        baseStyle = styles.daysNumber; // Switch to Days style
-      } else if (totalHours >= 1) {
-        displayValue = totalHours;
-        displayLabel = "HOURS SINCE";
-      } else if (totalMinutes >= 1) {
-        displayValue = totalMinutes;
-        displayLabel = "MINUTES SINCE";
-      } else {
-        displayValue = totalSeconds;
-        displayLabel = "SECONDS SINCE";
-      }
+      const { displayLabel, displayValue, isDaysView, remainingSeconds } =
+        item.type === "countdown"
+          ? calculateCountdown(forthcommingMs, baseStyle)
+          : calculateCountup(elapsedMs, baseStyle);
 
       const formattedDate = format(new Date(item.createdAt), "MMM dd, yyyy"); // Corrected format string
 
       // Get font size and line height from the determined base style
-      const valueFontSize = baseStyle.fontSize;
-      const valueLineHeight = baseStyle.lineHeight;
+
+      if (
+        item.type === "countdown" &&
+        remainingSeconds <= 0 &&
+        !item.completed
+      ) {
+        setTimeout(() => {
+          handleComplete(item.id);
+        }, 0);
+        // Use runOnJS if this is inside a reanimated worklet, otherwise just handleComplete(item.id);
+      }
 
       return (
         <TouchableOpacity
@@ -281,6 +355,8 @@ export default function Index() {
                 creation: item.createdAt,
                 name: item.name,
                 id: item.id.toString(),
+                type: item.type.toString(),
+                completed: item.completed.toString(),
               },
             });
           }} // Example press
@@ -289,64 +365,111 @@ export default function Index() {
         >
           <View style={styles.cardContainer}>
             <LinearGradient
-              colors={["#FEC9CE", "#FF96A1"]}
+              colors={
+                item.type === "countdown"
+                  ? ["#E0E0E0", "#4285F4"]
+                  : ["#FEC9CE", "#FF96A1"]
+              }
               start={{ x: 1, y: 1 }}
               end={{ x: 0, y: 0 }}
               style={styles.gradient}
             >
-              <View style={styles.cardContent}>
-                {/* Left Side */}
-                <View style={styles.leftColumn}>
+              {!item.completed ? (
+                <View style={styles.cardContent}>
+                  {/* Left Side */}
+                  <View style={styles.leftColumn}>
+                    <Text
+                      style={[
+                        // Apply the base style first (contains fontFamily)
+                        baseStyle,
+                        // Override only specific properties if needed, but fontSize/lineHeight are already in baseStyle
+                        // { fontSize: valueFontSize, lineHeight: valueLineHeight },
+                      ]}
+                      // Use tick in key ONLY if it's H/M/S view and ONLY if item is not archived
+                      key={
+                        !isDaysView && !item.isArchived
+                          ? `time-${tick}`
+                          : `static-${item.id}`
+                      }
+                    >
+                      {displayValue}
+                    </Text>
+                    <Text style={styles.daysLabel}>{displayLabel}</Text>
+                  </View>
+
+                  {/* Right Side */}
+                  <View style={styles.rightColumn}>
+                    <Text style={styles.dateText}>{formattedDate}</Text>
+                    <Text
+                      style={styles.nameText}
+                      numberOfLines={2}
+                      ellipsizeMode="tail"
+                    >
+                      {item.name}
+                    </Text>
+                  </View>
+
+                  {/* Optional: Notification Bell Icon */}
+                  {item.hasNotification && (
+                    <IconButton
+                      icon="bell-outline"
+                      size={18}
+                      style={styles.notificationIcon}
+                      iconColor={"rgba(0, 0, 0, 0.6)"}
+                    />
+                  )}
+
+                  {/* Trash Icon */}
+                  <IconButton
+                    icon="delete-outline"
+                    size={20}
+                    onPress={() => handleDeleteCounter(item.id)}
+                    iconColor={theme.colors.onPrimary}
+                    style={styles.deleteIcon}
+                  />
+                </View>
+              ) : (
+                <View
+                  style={[
+                    styles.cardContent,
+                    {
+                      flexDirection: "column",
+                      alignItems: "flex-start",
+                      justifyContent: "center",
+                      maxHeight: 120,
+                      paddingVertical: 0,
+                      // paddingHorizontal: 0,
+                      // padding: 5,
+                      // position: "static",
+                    },
+                  ]}
+                >
                   <Text
                     style={[
-                      // Apply the base style first (contains fontFamily)
-                      baseStyle,
-                      // Override only specific properties if needed, but fontSize/lineHeight are already in baseStyle
-                      // { fontSize: valueFontSize, lineHeight: valueLineHeight },
+                      styles.hoursMinutesSecondsNumber,
+                      {
+                        fontSize: 40,
+                        lineHeight: 50,
+                        textDecorationLine: "line-through",
+                      },
                     ]}
-                    // Use tick in key ONLY if it's H/M/S view and ONLY if item is not archived
-                    key={
-                      !isDaysView && !item.isArchived
-                        ? `time-${tick}`
-                        : `static-${item.id}`
-                    }
                   >
-                    {displayValue}
+                    {item.name.substring(0, 10)}
                   </Text>
-                  <Text style={styles.daysLabel}>{displayLabel}</Text>
-                </View>
-
-                {/* Right Side */}
-                <View style={styles.rightColumn}>
-                  <Text style={styles.dateText}>{formattedDate}</Text>
-                  <Text
-                    style={styles.nameText}
-                    numberOfLines={2}
-                    ellipsizeMode="tail"
-                  >
-                    {item.name}
-                  </Text>
-                </View>
-
-                {/* Optional: Notification Bell Icon */}
-                {item.hasNotification && (
                   <IconButton
-                    icon="bell-outline"
-                    size={18}
-                    style={styles.notificationIcon}
-                    iconColor={"rgba(0, 0, 0, 0.6)"}
+                    icon="delete-outline"
+                    size={20}
+                    onPress={() => handleDeleteCounter(item.id)}
+                    iconColor={theme.colors.onPrimary}
+                    style={styles.deleteIcon}
                   />
-                )}
-
-                {/* Trash Icon */}
-                <IconButton
-                  icon="delete-outline"
-                  size={20}
-                  onPress={() => handleDeleteCounter(item.id)}
-                  iconColor={theme.colors.onPrimary}
-                  style={styles.deleteIcon}
-                />
-              </View>
+                  <Text
+                    style={[styles.hoursMinutesSecondsNumber, { fontSize: 30 }]}
+                  >
+                    completed
+                  </Text>
+                </View>
+              )}
             </LinearGradient>
           </View>
         </TouchableOpacity>
@@ -446,7 +569,13 @@ export default function Index() {
       <View style={{ flex: 1 }}>
         <FlatList
           data={displayedCounters}
-          renderItem={renderCounterItem}
+          renderItem={
+            isModalVisible
+              ? () => {
+                  return <></>;
+                }
+              : renderCounterItem
+          }
           keyExtractor={(item) => item.id}
           ListEmptyComponent={
             <View style={styles.centered}>
@@ -476,6 +605,10 @@ export default function Index() {
         onClose={onClose}
         handleAddCounter={handleAddCounter}
         setNewCounterName={setNewCounterName}
+        setType={setType}
+        type={type}
+        date={date}
+        setDate={setDate}
       />
     </SafeAreaView>
   );
@@ -540,8 +673,8 @@ const styles = StyleSheet.create({
   cardContainer: {
     marginVertical: 7,
     borderRadius: 18,
-    backgroundColor: "white",
-    elevation: 3,
+    // backgroundColor: "white",
+    // elevation: 1,
   },
   gradient: {
     borderRadius: 18,
@@ -558,8 +691,9 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
-    width: 130,
-    maxWidth: 170,
+    // width: 100,
+    maxWidth: 145,
+    // flexGrow: 1,
   },
   rightColumn: {
     flex: 1,

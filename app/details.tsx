@@ -45,10 +45,12 @@ export default function Details() {
   // console.log("Fonts loaded! Rendering content."); // For debugging
 
   const theme = useTheme();
-  const { creation, name, id } = useLocalSearchParams<{
+  const { creation, name, id, type, completed } = useLocalSearchParams<{
     creation: string;
     name: string;
     id: string;
+    type: string;
+    completed: string;
   }>();
   const createdAt = parseInt(Array.isArray(creation) ? creation[0] : creation);
 
@@ -56,7 +58,7 @@ export default function Details() {
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
   const [isVisible, setIsVisible] = useState<boolean>(false);
 
-  const calculations = useCallback((creationTimestamp: number) => {
+  const calculationsCountup = useCallback((creationTimestamp: number) => {
     const now = Date.now();
     const elapsedMs = Math.max(0, now - creationTimestamp);
 
@@ -77,23 +79,63 @@ export default function Details() {
       seconds: String(seconds).padStart(2, "0"),
     });
   }, []);
+  const calculationsCountdown = useCallback((creationTimestamp: number) => {
+    const now = Date.now();
+    const elapsedMs = Math.max(0, creationTimestamp - now);
 
-  useEffect(() => {
-    //  Perform initial calculation immediately
-    calculations(createdAt);
+    const totalSeconds = Math.floor(elapsedMs / 1000);
+    const totalMinutes = Math.floor(totalSeconds / 60);
+    const totalHours = Math.floor(totalMinutes / 60);
+    const totalDays = Math.floor(totalHours / 24);
 
-    // Then set up the interval for subsequent updates
-    intervalRef.current = setInterval(() => {
-      calculations(createdAt);
-    }, 1000);
+    const seconds = totalSeconds % 60;
+    const minutes = totalMinutes % 60;
+    const hours = totalHours % 24;
+    const days = totalDays;
 
-    // Clean up the interval when the component unmounts
-    return () => {
-      if (intervalRef.current) {
-        clearInterval(intervalRef.current);
-      }
-    };
-  }, [createdAt, calculations]);
+    setCalculated({
+      days: String(days).padStart(2, "0"),
+      hours: String(hours).padStart(2, "0"),
+      minutes: String(minutes).padStart(2, "0"),
+      seconds: String(seconds).padStart(2, "0"),
+    });
+  }, []);
+
+  type === "countup"
+    ? useEffect(() => {
+        //  Perform initial calculation immediately
+
+        calculationsCountup(createdAt);
+
+        // Then set up the interval for subsequent updates
+        intervalRef.current = setInterval(() => {
+          calculationsCountup(createdAt);
+        }, 1000);
+
+        // Clean up the interval when the component unmounts
+        return () => {
+          if (intervalRef.current) {
+            clearInterval(intervalRef.current);
+          }
+        };
+      }, [createdAt, calculationsCountup])
+    : useEffect(() => {
+        //  Perform initial calculation immediately
+
+        calculationsCountdown(createdAt);
+
+        // Then set up the interval for subsequent updates
+        intervalRef.current = setInterval(() => {
+          calculationsCountdown(createdAt);
+        }, 1000);
+
+        // Clean up the interval when the component unmounts
+        return () => {
+          if (intervalRef.current) {
+            clearInterval(intervalRef.current);
+          }
+        };
+      }, [createdAt, calculationsCountdown]);
 
   const createdAtDate = new Date(createdAt);
 
@@ -105,65 +147,92 @@ export default function Details() {
 
   return (
     <LinearGradient
-      colors={["#FEC9CE", "#FF96A3"]}
+      colors={
+        type === "countdown" ? ["#E0E0E0", "#4285F4"] : ["#FED0CE", "#FF9693"]
+      }
       start={{ x: 1, y: 1 }}
       end={{ x: 0, y: 0 }}
       style={styles.container}
     >
       <SafeAreaView style={styles.addgradient}>
-        <View style={styles.topContainer}>
-          <Text style={styles.gradientText}>Since {formattedCreatedAt}</Text>
-          <Text style={[styles.gradientText, { fontSize: 20 }]}>
-            {name.substring(0, 12)}
-          </Text>
-        </View>
-
-        <View style={styles.timeDisplay}>
-          <View style={{ alignItems: "center" }}>
-            <Text style={[styles.timeValue, { fontSize: 60 }]}>
-              {calculated?.days}
+        {completed === "false" && (
+          <View style={styles.topContainer}>
+            <Text style={styles.gradientText}>
+              {type === "countup" && "Since"} {formattedCreatedAt}
             </Text>
-
-            <Text style={styles.timeLabel}>Days</Text>
-          </View>
-
-          <View style={{ alignItems: "center" }}>
-            <Text style={[styles.timeValue, { fontSize: 55 }]}>
-              {calculated?.hours}
+            <Text style={[styles.gradientText, { fontSize: 20 }]}>
+              {name.substring(0, 12)}
             </Text>
-            <Text style={styles.timeLabel}>Hours</Text>
           </View>
+        )}
 
-          <View style={{ alignItems: "center" }}>
+        {type === "countup" || completed === "false" ? (
+          <View style={styles.timeDisplay}>
+            <View style={{ alignItems: "center" }}>
+              <Text style={[styles.timeValue, { fontSize: 60 }]}>
+                {calculated?.days}
+              </Text>
+
+              <Text style={styles.timeLabel}>Days</Text>
+            </View>
+
+            <View style={{ alignItems: "center" }}>
+              <Text style={[styles.timeValue, { fontSize: 55 }]}>
+                {calculated?.hours}
+              </Text>
+              <Text style={styles.timeLabel}>Hours</Text>
+            </View>
+
+            <View style={{ alignItems: "center" }}>
+              <Text style={[styles.timeValue, { fontSize: 50 }]}>
+                {calculated?.minutes}
+              </Text>
+
+              <Text style={styles.timeLabel}>Minutes</Text>
+            </View>
+
+            <View style={{ alignItems: "center" }}>
+              <Text style={[styles.timeValue, { fontSize: 45 }]}>
+                {calculated?.seconds}
+              </Text>
+
+              <Text style={styles.timeLabel}>Seconds</Text>
+            </View>
+          </View>
+        ) : (
+          <View style={[styles.timeDisplay, { justifyContent: "center" }]}>
+            <Text
+              style={[
+                styles.timeValue,
+                { fontSize: 50, textDecorationLine: "line-through" },
+              ]}
+            >
+              {name}
+            </Text>
+            <Text style={[styles.timeValue, { fontSize: 50 }]}>Completed</Text>
             <Text style={[styles.timeValue, { fontSize: 50 }]}>
-              {calculated?.minutes}
+              {formattedCreatedAt}
             </Text>
-
-            <Text style={styles.timeLabel}>Minutes</Text>
           </View>
+        )}
 
-          <View style={{ alignItems: "center" }}>
-            <Text style={[styles.timeValue, { fontSize: 45 }]}>
-              {calculated?.seconds}
-            </Text>
-
-            <Text style={styles.timeLabel}>Seconds</Text>
-          </View>
-        </View>
-
-        <TouchableOpacity onPress={() => setIsVisible(true)}>
-          <View style={styles.btnTxtWrapper}>
-            <Icon source="pencil" size={18} color="#000" />
-            <Text style={styles.gradientText}>EDIT</Text>
-          </View>
-        </TouchableOpacity>
-        <EditModal
-          isVisible={isVisible}
-          onClose={() => setIsVisible(false)}
-          id={id}
-          cName={name}
-          cDate={formattedCreatedAt}
-        />
+        {type === "countup" && (
+          <>
+            <TouchableOpacity onPress={() => setIsVisible(true)}>
+              <View style={styles.btnTxtWrapper}>
+                <Icon source="pencil" size={18} color="#000" />
+                <Text style={styles.gradientText}>EDIT</Text>
+              </View>
+            </TouchableOpacity>
+            <EditModal
+              isVisible={isVisible}
+              onClose={() => setIsVisible(false)}
+              id={id}
+              cName={name}
+              cDate={formattedCreatedAt}
+            />
+          </>
+        )}
       </SafeAreaView>
     </LinearGradient>
   );
