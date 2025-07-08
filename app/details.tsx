@@ -5,7 +5,7 @@ import {
   Alert,
   ActivityIndicator,
   TouchableOpacity,
-} from "react-native"; // Import ActivityIndicator
+} from "react-native";
 import React, { useEffect, useState, useRef, useCallback } from "react";
 import { Icon, useTheme } from "react-native-paper";
 import { LinearGradient } from "expo-linear-gradient";
@@ -204,7 +204,7 @@ export default function Details() {
             <Text
               style={[
                 styles.timeValue,
-                { fontSize: 50, textDecorationLine: "line-through" },
+                { fontSize: 25, textDecorationLine: "line-through" },
               ]}
             >
               {name}
