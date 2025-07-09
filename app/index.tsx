@@ -9,6 +9,7 @@ import {
   ActivityIndicator,
   StyleProp,
   ToastAndroid,
+  useColorScheme,
 } from "react-native";
 import {
   useTheme,
@@ -16,6 +17,7 @@ import {
   IconButton,
   Appbar,
   SegmentedButtons,
+  Button,
 } from "react-native-paper";
 import { useFonts } from "expo-font";
 import * as SplashScreen from "expo-splash-screen";
@@ -25,6 +27,23 @@ import { format } from "date-fns";
 import { useThemeContext } from "@/context/ThemeContext";
 import { useRouter } from "expo-router";
 import { useCounterContext } from "@/context/counterContext";
+import Animated, {
+  Easing,
+  runOnJS,
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming,
+} from "react-native-reanimated";
+import {
+  Directions,
+  Gesture,
+  GestureDetector,
+} from "react-native-gesture-handler";
+
+const BUTTON_WIDTH = 150;
+const BUTTON_GAP = 0;
+const LEFT_POSITION = 40;
+const RIGHT_POSITION = BUTTON_WIDTH + 60;
 
 // Keep splash screen visible while fonts load or data loads
 SplashScreen.preventAutoHideAsync();
@@ -45,21 +64,38 @@ export interface Counter {
 // --- AsyncStorage Key ---
 const STORAGE_KEY = "@days_since_app_data_v2"; // Use versioned key
 
-// --- Main App Component ---
-
-type themeModeType = "light" | "dark" | "system"; // Renamed to avoid conflict with paper theme
+type themeModeType = "light" | "dark" | "system";
 
 export default function Index() {
+  const { themeMode } = useThemeContext();
   const { toggleTheme, setTheme } = useThemeContext();
   const theme = useTheme(); // Access theme colors
+  const sliderTranslateX = useSharedValue(LEFT_POSITION);
 
   const { counters, setCounters, markCounterCompleted } = useCounterContext();
 
   const [isDataLoaded, setIsDataLoaded] = useState(false);
-  const [currentView, setCurrentView] = useState<"current" | "past">("current");
+  const [currentView, setCurrentView] = useState<"current" | "archive">(
+    "current"
+  );
   const [tick, setTick] = useState(0); // State to force updates for elapsed time
 
   const router = useRouter(); // Initialize router
+
+  // setting initial position of slider
+  useEffect(() => {
+    if (currentView === "current") {
+      sliderTranslateX.value = withTiming(LEFT_POSITION, {
+        duration: 180,
+        easing: Easing.linear,
+      });
+    } else {
+      sliderTranslateX.value = withTiming(RIGHT_POSITION, {
+        duration: 180,
+        easing: Easing.linear,
+      });
+    }
+  }, [currentView]);
 
   useEffect(() => {
     const themesetter = async () => {
@@ -147,6 +183,44 @@ export default function Index() {
       clearInterval(intervalId);
     };
   }, [counters, currentView]);
+
+  // helper function for setting state of view
+  const handleFlingDirection = (direction: "left" | "right") => {
+    if (direction === "right") {
+      setCurrentView("current");
+
+      sliderTranslateX.value = withTiming(LEFT_POSITION, {
+        duration: 200,
+        easing: Easing.linear,
+      });
+    } else if (direction === "left") {
+      setCurrentView("archive");
+      sliderTranslateX.value = withTiming(RIGHT_POSITION, {
+        duration: 200,
+        easing: Easing.linear,
+      });
+    }
+  };
+
+  // listners of gesture
+  const flingRightGesture = Gesture.Fling()
+    .direction(Directions.RIGHT)
+    .onStart(() => {
+      runOnJS(handleFlingDirection)("right");
+    });
+
+  const flingLeftGesture = Gesture.Fling()
+    .direction(Directions.LEFT)
+    .onStart(() => {
+      runOnJS(handleFlingDirection)("left");
+    });
+
+  // slider animation
+  const animatedSliderStyle = useAnimatedStyle(() => {
+    return {
+      transform: [{ translateX: sliderTranslateX.value }],
+    };
+  });
 
   // --- Filtered Counters for Display ---
   const displayedCounters = useMemo(() => {
@@ -480,66 +554,73 @@ export default function Index() {
         />
       </Appbar.Header>
 
-      {/* Current/Past Tabs */}
       <View style={styles.segmentContainer}>
-        <SegmentedButtons
-          value={currentView}
-          onValueChange={(value) => setCurrentView(value as "current" | "past")}
-          style={styles.segmentButtons}
-          density="medium"
-          buttons={[
+        <Animated.View
+          style={[
+            styles.sliderBackground,
+            animatedSliderStyle,
             {
-              value: "current",
-              label: "Current",
-              style:
-                currentView === "current"
-                  ? styles.segmentSelected
-                  : styles.segmentUnselected,
-              labelStyle:
-                currentView === "current"
-                  ? styles.segmentSelectedLabel
-                  : styles.segmentUnselectedLabel,
-            },
-            {
-              value: "past",
-              label: "Past",
-              style:
-                currentView === "past"
-                  ? styles.segmentSelected
-                  : styles.segmentUnselected,
-              labelStyle:
-                currentView === "past"
-                  ? styles.segmentSelectedLabel
-                  : styles.segmentUnselectedLabel,
+              backgroundColor: "#4285F4",
             },
           ]}
         />
-      </View>
+        <Button
+          labelStyle={[
+            styles.buttonLabel,
+            {
+              fontSize: currentView === "current" ? 17 : 15,
+              fontWeight: currentView === "current" ? "bold" : "900",
+            },
+          ]}
+          onPress={() => setCurrentView("current")}
+          style={[styles.topbtn, styles.transparentButton, {}]}
+          textColor={themeMode === "dark" ? "#fff" : "#000"}
+        >
+          Counters
+        </Button>
 
-      <View style={{ flex: 1 }}>
-        <FlatList
-          data={displayedCounters}
-          renderItem={renderCounterItem} // No conditional rendering based on isModalVisible
-          keyExtractor={(item) => item.id}
-          ListEmptyComponent={
-            <View style={styles.centered}>
-              <Text style={styles.emptyText}>
-                No counters {currentView === "past" ? "archived" : "yet"}.
-              </Text>
-              {currentView === "current" && !isDataLoaded && (
-                <ActivityIndicator style={{ marginTop: 20 }} size="large" />
-              )}
-              {currentView === "current" &&
-                isDataLoaded &&
-                displayedCounters.length === 0 && (
-                  <Text style={styles.emptyText}>Press '+' to add one!</Text>
-                )}
-            </View>
-          }
-          contentContainerStyle={styles.listContent}
-        />
+        <Button
+          labelStyle={[
+            styles.buttonLabel,
+            {
+              fontSize: currentView === "archive" ? 17 : 15,
+              fontWeight: currentView === "archive" ? "bold" : "900",
+            },
+          ]}
+          onPress={() => setCurrentView("archive")}
+          style={[styles.topbtn, styles.transparentButton]}
+          textColor={themeMode === "dark" ? "#fff" : "#000"}
+        >
+          Archieves
+        </Button>
       </View>
-      {/* Removed AddModal component here */}
+      <GestureDetector
+        gesture={Gesture.Simultaneous(flingRightGesture, flingLeftGesture)}
+      >
+        <View style={{ flex: 1 }}>
+          <FlatList
+            data={displayedCounters}
+            renderItem={renderCounterItem} // No conditional rendering based on isModalVisible
+            keyExtractor={(item) => item.id}
+            ListEmptyComponent={
+              <View style={styles.centered}>
+                <Text style={styles.emptyText}>
+                  No counters {currentView === "archive" ? "archived" : "yet"}.
+                </Text>
+                {currentView === "current" && !isDataLoaded && (
+                  <ActivityIndicator style={{ marginTop: 20 }} size="large" />
+                )}
+                {currentView === "current" &&
+                  isDataLoaded &&
+                  displayedCounters.length === 0 && (
+                    <Text style={styles.emptyText}>Press '+' to add one!</Text>
+                  )}
+              </View>
+            }
+            contentContainerStyle={styles.listContent}
+          />
+        </View>
+      </GestureDetector>
     </SafeAreaView>
   );
 }
@@ -562,10 +643,29 @@ const styles = StyleSheet.create({
     alignItems: "center",
     padding: 20,
   },
+  buttonLabel: {
+    // color: "#000",
+    fontSize: 15,
+  },
+  topbtn: {
+    width: BUTTON_WIDTH,
+    padding: 5,
+    borderRadius: 30,
+    zIndex: 1,
+  },
+  transparentButton: {
+    backgroundColor: "transparent",
+  },
   segmentContainer: {
+    flexDirection: "row",
+    width: "100%",
+    justifyContent: "space-evenly",
     alignItems: "center",
-    paddingVertical: 30,
-    paddingHorizontal: "15%",
+    marginBottom: 20,
+    gap: BUTTON_GAP,
+    position: "relative",
+    borderRadius: 10,
+    padding: 5,
   },
   segmentButtons: {
     borderRadius: 10,
@@ -613,6 +713,16 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     maxWidth: 145,
+  },
+  sliderBackground: {
+    position: "absolute",
+    height: 2,
+    width: BUTTON_WIDTH - 50,
+    backgroundColor: "#FF96A3",
+    borderRadius: 15,
+    left: 5,
+    top: 45,
+    elevation: 1,
   },
   rightColumn: {
     flex: 1,

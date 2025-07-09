@@ -161,7 +161,7 @@ export default function Details() {
               {type === "countup" && "Since"} {formattedCreatedAt}
             </Text>
             <Text style={[styles.gradientText, { fontSize: 20 }]}>
-              {name.substring(0, 12)}
+              {name.substring(0, 20)}
             </Text>
           </View>
         )}

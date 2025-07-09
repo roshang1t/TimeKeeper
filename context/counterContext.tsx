@@ -109,7 +109,9 @@ export const CounterProvider = ({
   const markCounterCompleted = useCallback((counterId: string) => {
     setCounters((prevCounters) =>
       prevCounters.map((counter) =>
-        counter.id === counterId ? { ...counter, completed: true } : counter
+        counter.id === counterId
+          ? { ...counter, completed: true, isArchived: true }
+          : counter
       )
     );
   }, []);
@@ -191,7 +193,7 @@ export const CounterProvider = ({
               await Notifications.scheduleNotificationAsync({
                 content: {
                   title: "Countdown Finished!",
-                  body: `${newCounterData.name} has reached its target!`,
+                  body: `${newCounterData.name.substring(0, 10)}`,
                   data: { counterId: id, notificationType: "exactTime" }, // Add type for identification
                 },
                 trigger: {

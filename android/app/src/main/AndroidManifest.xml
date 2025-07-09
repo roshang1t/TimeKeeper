@@ -24,7 +24,7 @@
         <action android:name="android.intent.action.VIEW"/>
         <category android:name="android.intent.category.DEFAULT"/>
         <category android:name="android.intent.category.BROWSABLE"/>
-        <data android:scheme="myapp"/>
+        <data android:scheme="timekeeper"/>
         <data android:scheme="com.cody669.TimeKeeper"/>
       </intent-filter>
     </activity>
