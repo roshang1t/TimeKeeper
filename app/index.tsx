@@ -591,7 +591,7 @@ export default function Index() {
           style={[styles.topbtn, styles.transparentButton]}
           textColor={themeMode === "dark" ? "#fff" : "#000"}
         >
-          Archieves
+          Archives
         </Button>
       </View>
       <GestureDetector
