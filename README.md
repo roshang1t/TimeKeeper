@@ -2,7 +2,7 @@
 
 [Download ⬇️](https://github.com/roshan669/TimeKeeper/releases/download/timekeeper/timeKeeper.apk)
 
-<img src="https://github.com/user-attachments/assets/e935c9ed-6073-4994-ab1e-b37e78f6aa75" width="300" height="300">
+<img src="https://github.com/user-attachments/assets/e935c9ed-6073-4994-ab1e-b37e78f6aa75" width="150" height="150">
 
 ## A countup app that is essential for day today life for keeping track of time
 
