@@ -14,5 +14,6 @@
 <img src="https://github.com/roshan669/TimeKeeper/blob/master/assets/ss5.jpg?raw=true" height="250" alt="TimeKeeper Screenshot 1" style=" border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); flex-shrink: 0;"/>
 <img src="https://github.com/roshan669/TimeKeeper/blob/master/assets/ss6.jpg?raw=true" height="250" alt="TimeKeeper Screenshot 1" style=" border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); flex-shrink: 0;"/>
 </div>
- ### Download the latest version from releases
+
+### Download the latest version from releases
  [Download](https://github.com/roshan669/TimeKeeper/releases)
