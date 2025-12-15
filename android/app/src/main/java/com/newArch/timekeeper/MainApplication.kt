@@ -1,4 +1,4 @@
-package com.cody669.TimeKeeper
+package com.newArch.timekeeper
 
 import android.app.Application
 import android.content.res.Configuration

@@ -1,4 +1,4 @@
-package com.cody669.TimeKeeper
+package com.newArch.timekeeper
 import expo.modules.splashscreen.SplashScreenManager
 
 import android.os.Build
