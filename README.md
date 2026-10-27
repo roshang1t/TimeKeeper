@@ -1,50 +1,25 @@
-# Welcome to your Expo app 👋
+# Timekeeper
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+[![Download Apk](https://custom-icon-badges.demolab.com/badge/-Download_From_PlayStore-black?style=for-the-badge&logo=download&logoColor=white)](https://play.google.com/store/apps/details?id=com.newArch.timekeeper)
 
-## Get started
+## Download APK ![GitHub Downloads (all assets, all releases)](https://img.shields.io/github/downloads/roshang1t/TimeKeeper/total?link=https%3A%2F%2Fgithub.com%2Froshang1t%2FTimeKeeper%2Freleases&label=Github%20Downloads)
 
-1. Install dependencies
 
-   ```bash
-   npm install
-   ```
+[![Download Apk](https://custom-icon-badges.demolab.com/badge/-Download_From_Github-black?style=for-the-badge&logo=download&logoColor=white)](https://github.com/roshang1t/TimeKeeper/releases/latest)
 
-2. Start the app
+[![Download Apk](https://custom-icon-badges.demolab.com/badge/-Download_Instantly-black?style=for-the-badge&logo=download&logoColor=white)](https://github.com/roshang1t/TimeKeeper/releases/download/timekeeper/timeKeeper.apk)
 
-   ```bash
-   npx expo start
-   ```
+<img src="https://github.com/user-attachments/assets/e935c9ed-6073-4994-ab1e-b37e78f6aa75" width="150" height="150">
 
-In the output, you'll find options to open the app in a
+## A countup app that is essential for day today life for keeping track of time
 
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
+## Screenshots
 
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
+<div style="display:flex; justify-content:center; gap: 10px; overflow-x: auto; padding-bottom: 10px;">
+<img src="https://github.com/roshang1t/TimeKeeper/blob/master/assets/ss2.jpg?raw=true" height="250" alt="TimeKeeper Screenshot 1" style=" border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); flex-shrink: 0;"/>
+<img src="https://github.com/roshang1t/TimeKeeper/blob/master/assets/ss3.jpg?raw=true" height="250" alt="TimeKeeper Screenshot 1" style=" border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); flex-shrink: 0;"/>
+<img src="https://github.com/roshang1t/TimeKeeper/blob/master/assets/ss5.jpg?raw=true" height="250" alt="TimeKeeper Screenshot 1" style=" border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); flex-shrink: 0;"/>
+<img src="https://github.com/roshang1t/TimeKeeper/blob/master/assets/ss6.jpg?raw=true" height="250" alt="TimeKeeper Screenshot 1" style=" border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); flex-shrink: 0;"/>
+</div>
 
-## Get a fresh project
-
-When you're ready, run:
-
-```bash
-npm run reset-project
-```
-
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
-
-## Learn more
-
-To learn more about developing your project with Expo, look at the following resources:
-
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
-
-## Join the community
-
-Join our community of developers creating universal apps.
-
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+[![Download Apk](https://custom-icon-badges.demolab.com/badge/-Download_From_PlayStore-black?style=for-the-badge&logo=download&logoColor=white)](https://play.google.com/store/apps/details?id=com.newArch.timekeeper)
