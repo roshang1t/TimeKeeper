@@ -3,6 +3,7 @@ import { defaultColorFor, surfaceFor } from "@/constants/theme";
 import { useCounterContext } from "@/context/counterContext";
 import { DEFAULT_REMINDERS } from "@/services/notifications";
 import { CounterColor, CounterType, RepeatInterval } from "@/types/counter";
+import { DEFAULT_REPEAT_DAYS } from "@/utils/repeat";
 import { useRouter } from "expo-router";
 import React, { useCallback, useState } from "react";
 import { KeyboardAvoidingView, Platform } from "react-native";
@@ -22,6 +23,7 @@ export default function AddModalScreen() {
   const [date, setDate] = useState<Date>(new Date());
   const [reminders, setReminders] = useState<number[]>(DEFAULT_REMINDERS);
   const [repeat, setRepeat] = useState<RepeatInterval>("none");
+  const [repeatDays, setRepeatDays] = useState(DEFAULT_REPEAT_DAYS);
   const [error, setError] = useState<string>("");
   const [openedAt] = useState(() => new Date());
 
@@ -70,7 +72,11 @@ export default function AddModalScreen() {
       type,
       color,
       emoji,
-      ...(type === CounterType.COUNTDOWN && { reminders, repeat }),
+      ...(type === CounterType.COUNTDOWN && {
+        reminders,
+        repeat,
+        ...(repeat === "custom" && { repeatDays }),
+      }),
     });
     router.back();
   };
@@ -98,6 +104,8 @@ export default function AddModalScreen() {
         onRemindersChange={setReminders}
         repeat={repeat}
         onRepeatChange={setRepeat}
+        repeatDays={repeatDays}
+        onRepeatDaysChange={setRepeatDays}
         error={error}
         submitLabel="Create counter"
         onSubmit={handleAddCounter}

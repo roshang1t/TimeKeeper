@@ -74,7 +74,11 @@ function normalizeCounter(raw: Partial<Counter>, index: number): Counter {
   };
   // A repeating countdown whose date passed while the app was closed moves to its next occurrence.
   if (counter.type === "countdown" && counter.repeat && !counter.completed) {
-    counter.createdAt = nextOccurrence(counter.createdAt, counter.repeat);
+    counter.createdAt = nextOccurrence(
+      counter.createdAt,
+      counter.repeat,
+      counter.repeatDays
+    );
   }
   return counter;
 }
@@ -170,10 +174,27 @@ export const CounterProvider = ({
       if (!current || current.completed) return;
 
       if (current.repeat && current.repeat !== "none") {
-        const nextTarget = nextOccurrence(current.createdAt, current.repeat);
+        const nextTarget = nextOccurrence(
+          current.createdAt,
+          current.repeat,
+          current.repeatDays
+        );
+        if (nextTarget === current.createdAt) return;
+        const next = { ...current, createdAt: nextTarget };
+        replaceCounter(next);
         // Repeating notification triggers keep firing on their own, so only the date moves.
-        if (nextTarget !== current.createdAt) {
-          replaceCounter({ ...current, createdAt: nextTarget });
+        // Custom intervals use one-shot triggers instead, which are topped up from the new date.
+        if (current.repeat === "custom") {
+          cancelCounterNotifications(current)
+            .then(() => scheduleCounterNotifications(next))
+            .then((notificationIds) =>
+              setCounters((prev) =>
+                prev.map((c) =>
+                  c.id === next.id ? { ...c, notificationIds } : c
+                )
+              )
+            )
+            .catch((e) => console.error("Failed to reschedule reminders", e));
         }
         return;
       }

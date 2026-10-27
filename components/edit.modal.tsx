@@ -3,6 +3,7 @@ import { defaultColorFor, surfaceFor } from "@/constants/theme";
 import { useCounterContext } from "@/context/counterContext";
 import { DEFAULT_REMINDERS } from "@/services/notifications";
 import { Counter, CounterColor, RepeatInterval } from "@/types/counter";
+import { DEFAULT_REPEAT_DAYS } from "@/utils/repeat";
 import React, { useState } from "react";
 import { KeyboardAvoidingView, Modal, Platform } from "react-native";
 import { useTheme } from "react-native-paper";
@@ -30,6 +31,9 @@ export default function EditModal({ isVisible, onClose, counter }: modalProps) {
   const [repeat, setRepeat] = useState<RepeatInterval>(
     counter.repeat ?? "none"
   );
+  const [repeatDays, setRepeatDays] = useState(
+    counter.repeatDays ?? DEFAULT_REPEAT_DAYS
+  );
   const [error, setError] = useState<string>("");
   const [openedAt] = useState(() => new Date());
 
@@ -53,6 +57,7 @@ export default function EditModal({ isVisible, onClose, counter }: modalProps) {
     if (isCountdown) {
       updates.reminders = reminders;
       updates.repeat = repeat;
+      updates.repeatDays = repeat === "custom" ? repeatDays : undefined;
     }
 
     updateCounter(counter.id, updates);
@@ -88,6 +93,8 @@ export default function EditModal({ isVisible, onClose, counter }: modalProps) {
           onRemindersChange={setReminders}
           repeat={repeat}
           onRepeatChange={setRepeat}
+          repeatDays={repeatDays}
+          onRepeatDaysChange={setRepeatDays}
           error={error}
           submitLabel="Save changes"
           onSubmit={editCounter}

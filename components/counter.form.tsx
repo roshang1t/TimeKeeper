@@ -12,7 +12,7 @@ import {
 } from "@/constants/theme";
 import { REMINDER_OPTIONS } from "@/services/notifications";
 import { CounterColor, RepeatInterval } from "@/types/counter";
-import { REPEAT_OPTIONS } from "@/utils/repeat";
+import { repeatLabel } from "@/utils/repeat";
 import React, { useEffect, useState } from "react";
 import {
   Pressable,
@@ -91,6 +91,8 @@ interface CounterFormProps {
   onRemindersChange: (reminders: number[]) => void;
   repeat: RepeatInterval;
   onRepeatChange: (repeat: RepeatInterval) => void;
+  repeatDays: number;
+  onRepeatDaysChange: (days: number) => void;
   error: string;
   submitLabel: string;
   onSubmit: () => void;
@@ -148,7 +150,7 @@ export default function CounterForm(props: CounterFormProps) {
   const repeatSummary =
     props.repeat === "none"
       ? ""
-      : ` · ${REPEAT_OPTIONS.find((o) => o.value === props.repeat)?.label}`;
+      : ` · ${repeatLabel(props.repeat, props.repeatDays)}`;
 
   const glyph = (size: number) =>
     props.emoji ? (
@@ -395,6 +397,8 @@ export default function CounterForm(props: CounterFormProps) {
                     onRemindersChange={props.onRemindersChange}
                     repeat={props.repeat}
                     onRepeatChange={props.onRepeatChange}
+                    repeatDays={props.repeatDays}
+                    onRepeatDaysChange={props.onRepeatDaysChange}
                   />
                 </View>
               )}

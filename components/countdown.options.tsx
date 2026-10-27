@@ -1,10 +1,10 @@
 import PillButton from "@/components/pill.button";
-import { spacing, surfaceFor, textStyles } from "@/constants/theme";
+import { radius, spacing, surfaceFor, textStyles } from "@/constants/theme";
 import { REMINDER_OPTIONS } from "@/services/notifications";
 import { RepeatInterval } from "@/types/counter";
-import { REPEAT_OPTIONS } from "@/utils/repeat";
-import React from "react";
-import { StyleSheet, Text, View } from "react-native";
+import { MAX_REPEAT_DAYS, REPEAT_OPTIONS } from "@/utils/repeat";
+import React, { useState } from "react";
+import { StyleSheet, Text, TextInput, View } from "react-native";
 import { useTheme } from "react-native-paper";
 
 interface CountdownOptionsProps {
@@ -12,6 +12,8 @@ interface CountdownOptionsProps {
   onRemindersChange: (reminders: number[]) => void;
   repeat: RepeatInterval;
   onRepeatChange: (repeat: RepeatInterval) => void;
+  repeatDays: number;
+  onRepeatDaysChange: (days: number) => void;
 }
 
 // Reminder + repeat pickers shared by the add and edit screens (countdowns only).
@@ -20,8 +22,18 @@ export default function CountdownOptions({
   onRemindersChange,
   repeat,
   onRepeatChange,
+  repeatDays,
+  onRepeatDaysChange,
 }: CountdownOptionsProps) {
   const s = surfaceFor(useTheme().dark);
+  // Kept as text so the field can be cleared while typing; only whole numbers >= 1 are applied.
+  const [daysText, setDaysText] = useState(String(repeatDays));
+  const changeDays = (text: string) => {
+    const digits = text.replace(/[^0-9]/g, "");
+    setDaysText(digits);
+    const days = Number(digits);
+    if (days >= 1) onRepeatDaysChange(Math.min(days, MAX_REPEAT_DAYS));
+  };
   const toggleReminder = (minutes: number) => {
     onRemindersChange(
       reminders.includes(minutes)
@@ -62,6 +74,31 @@ export default function CountdownOptions({
             />
           ))}
         </View>
+        {repeat === "custom" && (
+          <View style={styles.daysRow}>
+            <Text style={[styles.daysLabel, { color: s.text }]}>Every</Text>
+            <TextInput
+              value={daysText}
+              onChangeText={changeDays}
+              onBlur={() => setDaysText(String(repeatDays))}
+              keyboardType="number-pad"
+              maxLength={String(MAX_REPEAT_DAYS).length}
+              selectTextOnFocus
+              cursorColor={s.text}
+              style={[
+                styles.daysInput,
+                {
+                  color: s.text,
+                  backgroundColor: s.card,
+                  borderColor: s.border,
+                },
+              ]}
+            />
+            <Text style={[styles.daysLabel, { color: s.text }]}>
+              {repeatDays === 1 ? "day" : "days"}
+            </Text>
+          </View>
+        )}
       </View>
     </View>
   );
@@ -79,5 +116,23 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     flexWrap: "wrap",
     gap: spacing.sm,
+  },
+  daysRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm,
+  },
+  daysLabel: {
+    fontSize: 15,
+  },
+  daysInput: {
+    minWidth: 64,
+    height: 40,
+    borderRadius: radius.md,
+    borderCurve: "continuous",
+    borderWidth: StyleSheet.hairlineWidth,
+    paddingHorizontal: spacing.md,
+    fontSize: 16,
+    textAlign: "center",
   },
 });

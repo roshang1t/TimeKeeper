@@ -1,4 +1,6 @@
 import { Counter } from "@/types/counter";
+import { DEFAULT_REPEAT_DAYS } from "@/utils/repeat";
+import { addDays } from "date-fns";
 import * as Notifications from "expo-notifications";
 
 export const REMINDER_OPTIONS: { minutes: number; label: string }[] = [
@@ -9,6 +11,10 @@ export const REMINDER_OPTIONS: { minutes: number; label: string }[] = [
 ];
 
 export const DEFAULT_REMINDERS = [0];
+
+// Custom intervals have no repeating OS trigger, so this many upcoming occurrences are scheduled
+// one-shot, and topped up whenever the counter rolls forward or the app starts.
+const CUSTOM_OCCURRENCES_AHEAD = 4;
 
 export async function ensureNotificationPermission(): Promise<boolean> {
   const { status } = await Notifications.getPermissionsAsync();
@@ -35,6 +41,11 @@ function buildTrigger(
   const time = { hour: date.getHours(), minute: date.getMinutes() };
 
   switch (counter.repeat ?? "none") {
+    case "daily":
+      return {
+        type: Notifications.SchedulableTriggerInputTypes.DAILY,
+        ...time,
+      };
     case "weekly":
       return {
         type: Notifications.SchedulableTriggerInputTypes.WEEKLY,
@@ -68,26 +79,38 @@ export async function scheduleCounterNotifications(
     return [];
   }
 
+  const targets =
+    counter.repeat === "custom"
+      ? Array.from({ length: CUSTOM_OCCURRENCES_AHEAD }, (_, i) =>
+          addDays(
+            counter.createdAt,
+            i * Math.max(1, counter.repeatDays ?? DEFAULT_REPEAT_DAYS)
+          ).getTime()
+        )
+      : [counter.createdAt];
+
   const ids: string[] = [];
   for (const minutes of counter.reminders ?? DEFAULT_REMINDERS) {
-    const trigger = buildTrigger(counter, counter.createdAt - minutes * 60_000);
-    if (!trigger) continue;
-    try {
-      ids.push(
-        await Notifications.scheduleNotificationAsync({
-          content: {
-            title: counter.name,
-            body: reminderBody(counter, minutes),
-            data: {
-              counterId: counter.id,
-              notificationType: minutes === 0 ? "exactTime" : "reminder",
+    for (const target of targets) {
+      const trigger = buildTrigger(counter, target - minutes * 60_000);
+      if (!trigger) continue;
+      try {
+        ids.push(
+          await Notifications.scheduleNotificationAsync({
+            content: {
+              title: counter.name,
+              body: reminderBody(counter, minutes),
+              data: {
+                counterId: counter.id,
+                notificationType: minutes === 0 ? "exactTime" : "reminder",
+              },
             },
-          },
-          trigger,
-        })
-      );
-    } catch (error) {
-      console.error(`Failed to schedule reminder for ${counter.name}`, error);
+            trigger,
+          })
+        );
+      } catch (error) {
+        console.error(`Failed to schedule reminder for ${counter.name}`, error);
+      }
     }
   }
   return ids;

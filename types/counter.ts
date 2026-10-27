@@ -1,4 +1,6 @@
-export type RepeatInterval = "none" | "weekly" | "monthly" | "yearly";
+// "custom" repeats every `repeatDays` days
+export type RepeatInterval =
+  "none" | "daily" | "weekly" | "monthly" | "yearly" | "custom";
 
 // Keys of `palette` in constants/theme.ts
 export type CounterColor =
@@ -27,13 +29,16 @@ export interface Counter {
   startedAt?: number; // When the counter was created; drives the countdown progress bar
   reminders?: number[]; // Countdowns only: minutes before the target (0 = at the target time)
   repeat?: RepeatInterval; // Countdowns only: roll the target forward instead of completing
+  repeatDays?: number; // repeat === "custom" only: days between occurrences
   notificationIds?: string[]; // Scheduled notification IDs, replaced on every reschedule
   notificationId?: string; // Legacy (pre-reminders) exact-time notification ID
   todayNotificationId?: string; // Legacy (pre-reminders) "ends today" notification ID
 }
 
 export type NewCounter = Pick<Counter, "name" | "createdAt" | "type"> &
-  Partial<Pick<Counter, "reminders" | "repeat" | "color" | "emoji">>;
+  Partial<
+    Pick<Counter, "reminders" | "repeat" | "repeatDays" | "color" | "emoji">
+  >;
 
 export enum CounterType {
   COUNTDOWN = "countdown",

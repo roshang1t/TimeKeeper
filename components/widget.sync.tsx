@@ -6,6 +6,7 @@ import {
   updateCounterWidget,
 } from "@/services/widget";
 import { Counter } from "@/types/counter";
+import { DEFAULT_REPEAT_DAYS } from "@/utils/repeat";
 import type { CounterListItem } from "@/widgets/CounterListWidget";
 import type { CounterWidgetProps } from "@/widgets/CounterWidget";
 import { useEffect } from "react";
@@ -48,6 +49,7 @@ function listItems(
     type: c.type,
     target: c.createdAt,
     repeat: c.repeat ?? "none",
+    repeatDays: c.repeatDays ?? DEFAULT_REPEAT_DAYS,
     color: colorFor(c),
     tintColor: tint(colorFor(c), 0.18),
     emoji: c.emoji ?? "",
@@ -74,6 +76,7 @@ export default function WidgetSync() {
       target: counter?.createdAt ?? 0,
       startedAt: counter?.startedAt ?? 0,
       repeat: counter?.repeat ?? "none",
+      repeatDays: counter?.repeatDays ?? DEFAULT_REPEAT_DAYS,
       color: counter ? colorFor(counter) : "",
       tintColor: counter ? tint(colorFor(counter), 0.18) : "",
       emoji: counter?.emoji ?? "",

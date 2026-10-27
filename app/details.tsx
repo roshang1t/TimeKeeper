@@ -11,7 +11,7 @@ import {
 } from "@/constants/theme";
 import { useCounterContext } from "@/context/counterContext";
 import { REMINDER_OPTIONS } from "@/services/notifications";
-import { REPEAT_OPTIONS } from "@/utils/repeat";
+import { repeatLabel as labelForRepeat } from "@/utils/repeat";
 import {
   counterProgress,
   dateRange,
@@ -62,9 +62,7 @@ export default function Details() {
   );
   const progress = counterProgress(counter, now);
   const isOnWidget = widgetCounterId === counter.id;
-  const repeatLabel = REPEAT_OPTIONS.find(
-    (o) => o.value === counter.repeat && o.value !== "none"
-  )?.label;
+  const repeatLabel = labelForRepeat(counter.repeat, counter.repeatDays);
   const reminderLabels = isCountdown
     ? (counter.reminders ?? [0]).map(
         (m) => REMINDER_OPTIONS.find((o) => o.minutes === m)?.label ?? `${m}m`

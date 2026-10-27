@@ -24,7 +24,8 @@ export type CounterListItem = {
   name: string;
   type: "countdown" | "countup";
   target: number; // Counter.createdAt
-  repeat: "none" | "weekly" | "monthly" | "yearly";
+  repeat: "none" | "daily" | "weekly" | "monthly" | "yearly" | "custom";
+  repeatDays: number; // Days between occurrences when repeat is "custom"
   color: string; // Accent hex (see colorFor)
   tintColor: string; // Soft accent behind the emoji (see tint)
   emoji: string; // "" for none
@@ -70,7 +71,10 @@ const CounterListWidget = (
     if (isCountdown && item.repeat !== "none") {
       while (target <= now) {
         const next = new Date(target);
-        if (item.repeat === "weekly") next.setDate(next.getDate() + 7);
+        if (item.repeat === "daily") next.setDate(next.getDate() + 1);
+        else if (item.repeat === "custom")
+          next.setDate(next.getDate() + Math.max(1, item.repeatDays));
+        else if (item.repeat === "weekly") next.setDate(next.getDate() + 7);
         else if (item.repeat === "monthly") next.setMonth(next.getMonth() + 1);
         else next.setFullYear(next.getFullYear() + 1);
         target = next.getTime();
