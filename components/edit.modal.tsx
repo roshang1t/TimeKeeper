@@ -1,190 +1,99 @@
+import CounterForm from "@/components/counter.form";
+import { defaultColorFor, surfaceFor } from "@/constants/theme";
 import { useCounterContext } from "@/context/counterContext";
-import { Counter } from "@/types/counter";
-import { LinearGradient } from "expo-linear-gradient";
-import { useRouter } from "expo-router";
+import { DEFAULT_REMINDERS } from "@/services/notifications";
+import { Counter, CounterColor, RepeatInterval } from "@/types/counter";
 import React, { useState } from "react";
-import {
-  KeyboardAvoidingView,
-  Modal,
-  Platform,
-  StyleSheet,
-  Text,
-  View,
-} from "react-native";
-import DatePicker from "react-native-date-picker";
-import { Button, Icon, TextInput } from "react-native-paper";
+import { KeyboardAvoidingView, Modal, Platform } from "react-native";
+import { useTheme } from "react-native-paper";
 
 interface modalProps {
   isVisible: boolean;
   onClose: () => void;
-  id: string;
-  cName: string;
-  cDate: string;
-  type: string;
+  counter: Counter;
 }
 
-export default function EditModal({
-  isVisible,
-  onClose,
-  id,
-  cName,
-  cDate,
-  type,
-}: modalProps) {
-  const [date, setDate] = useState<Date>(new Date());
-  const [name, setName] = useState<string>();
+// Mount only while open, so every opening starts from the counter's current values.
+export default function EditModal({ isVisible, onClose, counter }: modalProps) {
+  const isCountdown = counter.type === "countdown";
+  const s = surfaceFor(useTheme().dark);
+
+  const [date, setDate] = useState<Date>(new Date(counter.createdAt));
+  const [name, setName] = useState<string>(counter.name);
+  const [emoji, setEmoji] = useState<string | undefined>(counter.emoji);
+  const [color, setColor] = useState<CounterColor>(
+    counter.color ?? defaultColorFor(counter.type)
+  );
+  const [reminders, setReminders] = useState<number[]>(
+    counter.reminders ?? DEFAULT_REMINDERS
+  );
+  const [repeat, setRepeat] = useState<RepeatInterval>(
+    counter.repeat ?? "none"
+  );
+  const [error, setError] = useState<string>("");
+  const [openedAt] = useState(() => new Date());
 
   const { updateCounter } = useCounterContext();
-  const router = useRouter();
 
-  function editCounter(id: string) {
-    const updates: Partial<Counter> = {};
-    if (name !== undefined && name !== null && name.trim() !== "") {
-      updates.name = name;
+  function editCounter() {
+    if (!name.trim()) {
+      setError("Give your counter a name.");
+      return;
     }
-    if (date !== undefined && date !== null) {
+    const dateChanged = date.getTime() !== counter.createdAt;
+    if (dateChanged && isCountdown && date.getTime() <= Date.now()) {
+      setError("Pick a date in the future for a countdown.");
+      return;
+    }
+
+    const updates: Partial<Counter> = { name: name.trim(), emoji, color };
+    if (dateChanged) {
       updates.createdAt = date.getTime();
     }
-
-    if (Object.keys(updates).length > 0) {
-      updateCounter(id, updates);
+    if (isCountdown) {
+      updates.reminders = reminders;
+      updates.repeat = repeat;
     }
 
+    updateCounter(counter.id, updates);
     onClose();
-    router.dismiss();
   }
 
   return (
     <Modal
       visible={isVisible}
       onRequestClose={onClose}
-      // transparent
       animationType="fade"
       statusBarTranslucent
+      navigationBarTranslucent
     >
-      {/* Outer View to act as a full-screen overlay */}
-      <LinearGradient
-        colors={["#FEC9CE", "#FF96A3"]}
-        start={{ x: 1, y: 1 }}
-        end={{ x: 0, y: 1 }}
-        style={styles.modalContentWrapper}
+      <KeyboardAvoidingView
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
+        style={{ flex: 1, backgroundColor: s.background }}
       >
-        <KeyboardAvoidingView
-          behavior={Platform.OS === "ios" ? "padding" : "height"} // 'height' is often more reliable than 'position' for Android
-          style={styles.keyboardAvoidingContainer}
-        >
-          <View style={styles.container}>
-            <Icon size={100} source={"clock-edit-outline"} />
-            <View style={{ width: "100%" }}>
-              <Text
-                style={[styles.modalTitle, { color: "#000", marginTop: 20 }]}
-              >
-                {cName}
-              </Text>
-              <TextInput
-                placeholder="New name here (optional)"
-                selectionColor="red"
-                onChangeText={setName}
-                underlineColor="#000"
-                activeUnderlineColor="#000"
-                placeholderTextColor="#000"
-                cursorColor="#000"
-                style={[{ backgroundColor: "" }]}
-                textColor="#000"
-                mode="outlined"
-                outlineStyle={{
-                  borderColor: "#000",
-                  borderRadius: 20,
-                  borderWidth: StyleSheet.hairlineWidth,
-                }}
-              />
-            </View>
-
-            <DatePicker
-              mode={"datetime"}
-              date={date}
-              onDateChange={setDate}
-              maximumDate={new Date()}
-            />
-
-            <View style={{ flexDirection: "row", gap: 50, marginTop: 25 }}>
-              <Button
-                mode="elevated"
-                elevation={2}
-                style={styles.modalButton}
-                labelStyle={styles.buttonLabel}
-                onPress={() => onClose()}
-              >
-                {/* <Icon source="cancel" size={35} color="black" /> */}
-                cancel
-              </Button>
-              <Button
-                mode="elevated"
-                elevation={2}
-                style={styles.modalButton}
-                labelStyle={styles.buttonLabel}
-                onPress={() => editCounter(id)}
-              >
-                {/* <Icon source="check" size={35} color="black" /> */}
-                Ok
-              </Button>
-            </View>
-          </View>
-        </KeyboardAvoidingView>
-      </LinearGradient>
+        <CounterForm
+          title="Edit counter"
+          type={counter.type}
+          name={name}
+          onNameChange={setName}
+          emoji={emoji}
+          onEmojiChange={setEmoji}
+          color={color}
+          onColorChange={setColor}
+          date={date}
+          onDateChange={setDate}
+          minimumDate={isCountdown ? openedAt : undefined}
+          maximumDate={isCountdown ? undefined : new Date()}
+          reminders={reminders}
+          onRemindersChange={setReminders}
+          repeat={repeat}
+          onRepeatChange={setRepeat}
+          error={error}
+          submitLabel="Save changes"
+          onSubmit={editCounter}
+          onClose={onClose}
+        />
+      </KeyboardAvoidingView>
     </Modal>
   );
 }
-
-const styles = StyleSheet.create({
-  modalContentWrapper: {
-    flex: 1, // Make it fill the entire modal
-    // backgroundColor: "rgba(0,0,0,0.5)", // Optional: Add a dim background
-    justifyContent: "center", // Center the content vertically
-    alignItems: "center", // Center the content horizontall
-  },
-  keyboardAvoidingContainer: {
-    flex: 1, // Make it fill its parent (modalContentWrapper)
-    width: "100%", // Also ensure it takes full width
-    justifyContent: "center", // Center the LinearGradient
-    alignItems: "center", // Center the LinearGradient
-  },
-  container: {
-    width: "90%", // Keep your desired width for the modal content
-    // height: "50%", // Keep your desired height for the modal content (e.g., 50% of parent)
-    padding: 20,
-    gap: 10, // Reduced gap to give more space for content
-    borderRadius: 10,
-    justifyContent: "center",
-    alignItems: "center",
-    // elevation: 20,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-  },
-  btn: {
-    height: 50,
-    width: "80%",
-    justifyContent: "center",
-    alignItems: "center",
-    borderBottomColor: "#000",
-    borderBottomWidth: 0.4,
-  },
-  modalTitle: {
-    marginBottom: 25,
-    textAlign: "center",
-    fontFamily: "Roboto-Bold",
-    fontSize: 15,
-  },
-  modalButton: {
-    minWidth: 110,
-    borderRadius: 8,
-    backgroundColor: "#ff96a9",
-  },
-  buttonLabel: {
-    color: "#000",
-    fontSize: 15,
-    // fontFamily: "Roboto-Bold",
-  },
-});

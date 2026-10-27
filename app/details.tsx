@@ -1,236 +1,234 @@
+import Badge from "@/components/badge";
+import DotGrid from "@/components/dot.grid";
 import EditModal from "@/components/edit.modal";
-import { useFonts } from "expo-font";
-import { LinearGradient } from "expo-linear-gradient";
-import { useLocalSearchParams } from "expo-router";
-import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
-  ActivityIndicator,
+  colorFor,
+  layout,
+  radius,
+  spacing,
+  surfaceFor,
+  textStyles,
+} from "@/constants/theme";
+import { useCounterContext } from "@/context/counterContext";
+import { REMINDER_OPTIONS } from "@/services/notifications";
+import { REPEAT_OPTIONS } from "@/utils/repeat";
+import {
+  counterProgress,
+  dateRange,
+  DAY_MS,
+  formatCounterValue,
+  splitDuration,
+} from "@/utils/time";
+import { format } from "date-fns";
+import { useLocalSearchParams, useRouter } from "expo-router";
+import React, { useEffect, useState } from "react";
+import {
+  Platform,
+  Pressable,
+  ScrollView,
   StyleSheet,
   Text,
-  TouchableOpacity,
   View,
 } from "react-native";
 import { Icon, useTheme } from "react-native-paper";
-import { SafeAreaView } from "react-native-safe-area-context";
-
-export interface data {
-  hours: string;
-  days: string;
-  minutes: string;
-  seconds: string;
-}
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 export default function Details() {
-  const [fontsLoaded] = useFonts({
-    // Renamed 'loaded' to 'fontsLoaded' for clarity
-    "Roboto-Regular": require("@/assets/fonts/roboto.ttf"),
-    "Roboto-Bold": require("@/assets/fonts/boldonse.ttf"), // Double-check this path and internal font name
-    "my-font": require("@/assets/fonts/myfont.ttf"), // Double-check this path and internal font name
-    "bung-ee": require("@/assets/fonts/bungee.ttf"), // Double-check this path and internal font name
-  });
+  const router = useRouter();
+  const insets = useSafeAreaInsets();
+  const s = surfaceFor(useTheme().dark);
+  const { id } = useLocalSearchParams<{ id: string }>();
+  const { counters, widgetCounterId, setWidgetCounterId } = useCounterContext();
+  // Read from context (not route params) so edits show up immediately
+  const counter = counters.find((c) => c.id === id);
 
-  // If fonts are not loaded, display a loading indicator or null
-  if (!fontsLoaded) {
-    // console.log("Fonts are not loaded yet..."); // For debugging
-    return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#fff" />
-        <Text style={{ color: "#fff", marginTop: 10 }}>Loading Fonts...</Text>
-      </View>
-    );
-  }
-
-  // console.log("Fonts loaded! Rendering content."); // For debugging
-
-  const theme = useTheme();
-  const { creation, name, id, type, completed } = useLocalSearchParams<{
-    creation: string;
-    name: string;
-    id: string;
-    type: string;
-    completed: string;
-  }>();
-  const createdAt = parseInt(Array.isArray(creation) ? creation[0] : creation);
-
-  const [calculated, setCalculated] = useState<data | undefined>();
-  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const [now, setNow] = useState(() => Date.now());
   const [isVisible, setIsVisible] = useState<boolean>(false);
 
-  const calculationsCountup = useCallback((creationTimestamp: number) => {
-    const now = Date.now();
-    const elapsedMs = Math.max(0, now - creationTimestamp);
-
-    const totalSeconds = Math.floor(elapsedMs / 1000);
-    const totalMinutes = Math.floor(totalSeconds / 60);
-    const totalHours = Math.floor(totalMinutes / 60);
-    const totalDays = Math.floor(totalHours / 24);
-
-    const seconds = totalSeconds % 60;
-    const minutes = totalMinutes % 60;
-    const hours = totalHours % 24;
-    const days = totalDays;
-
-    setCalculated({
-      days: String(days).padStart(2, "0"),
-      hours: String(hours).padStart(2, "0"),
-      minutes: String(minutes).padStart(2, "0"),
-      seconds: String(seconds).padStart(2, "0"),
-    });
-  }, []);
-  const calculationsCountdown = useCallback((creationTimestamp: number) => {
-    const now = Date.now();
-    const elapsedMs = Math.max(0, creationTimestamp - now);
-
-    const totalSeconds = Math.floor(elapsedMs / 1000);
-    const totalMinutes = Math.floor(totalSeconds / 60);
-    const totalHours = Math.floor(totalMinutes / 60);
-    const totalDays = Math.floor(totalHours / 24);
-
-    const seconds = totalSeconds % 60;
-    const minutes = totalMinutes % 60;
-    const hours = totalHours % 24;
-    const days = totalDays;
-
-    setCalculated({
-      days: String(days).padStart(2, "0"),
-      hours: String(hours).padStart(2, "0"),
-      minutes: String(minutes).padStart(2, "0"),
-      seconds: String(seconds).padStart(2, "0"),
-    });
-  }, []);
-
   useEffect(() => {
-    //  Perform initial calculation immediately
-    if (type === "countup") {
-      calculationsCountup(createdAt);
+    const interval = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(interval);
+  }, []);
 
-      // Then set up the interval for subsequent updates
-      intervalRef.current = setInterval(() => {
-        calculationsCountup(createdAt);
-      }, 1000);
-    } else {
-      calculationsCountdown(createdAt);
+  if (!counter) {
+    return null;
+  }
 
-      // Then set up the interval for subsequent updates
-      intervalRef.current = setInterval(() => {
-        calculationsCountdown(createdAt);
-      }, 1000);
-    }
+  const accent = colorFor(counter);
+  const isCountdown = counter.type === "countdown";
+  const { value, unit } = formatCounterValue(counter, now);
+  const { hours, minutes, seconds } = splitDuration(
+    isCountdown ? counter.createdAt - now : now - counter.createdAt
+  );
+  const progress = counterProgress(counter, now);
+  const isOnWidget = widgetCounterId === counter.id;
+  const repeatLabel = REPEAT_OPTIONS.find(
+    (o) => o.value === counter.repeat && o.value !== "none"
+  )?.label;
+  const reminderLabels = isCountdown
+    ? (counter.reminders ?? [0]).map(
+        (m) => REMINDER_OPTIONS.find((o) => o.minutes === m)?.label ?? `${m}m`
+      )
+    : [];
 
-    // Clean up the interval when the component unmounts
-    return () => {
-      if (intervalRef.current) {
-        clearInterval(intervalRef.current);
-      }
-    };
-  }, [createdAt, calculationsCountup, calculationsCountdown, type]);
+  // Dot timeline: the whole wait for a countdown, or the run up to the next milestone
+  const elapsedDays = isCountdown
+    ? (now - (counter.startedAt ?? now)) / DAY_MS
+    : (now - counter.createdAt) / DAY_MS;
+  const totalDays =
+    isCountdown && counter.startedAt
+      ? (counter.createdAt - counter.startedAt) / DAY_MS
+      : !isCountdown && progress?.caption
+        ? Number(progress.caption.replace(/\D/g, ""))
+        : 0;
+  const showTimeline = !counter.completed && totalDays >= 2;
 
-  const createdAtDate = new Date(createdAt);
-
-  const formattedCreatedAt = createdAtDate.toLocaleDateString("en-IN", {
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-  });
-
-  const formattedTime = createdAtDate.toLocaleTimeString();
+  const roundButton = (
+    icon: string,
+    label: string,
+    onPress: () => void,
+    active = false
+  ) => (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      onPress={onPress}
+      style={({ pressed }) => [
+        styles.roundButton,
+        {
+          borderColor: s.border,
+          backgroundColor: active ? s.inverse : pressed ? s.chip : s.card,
+        },
+      ]}
+    >
+      <Icon source={icon} size={20} color={active ? s.onInverse : s.text} />
+    </Pressable>
+  );
 
   return (
-    <LinearGradient
-      colors={
-        type === "countdown" ? ["#E0E0E0", "#4285F4"] : ["#FED0CE", "#FF9693"]
-      }
-      start={{ x: 1, y: 1 }}
-      end={{ x: 0, y: 0 }}
-      style={styles.container}
-    >
-      <SafeAreaView style={styles.addgradient}>
-        {completed === "false" && (
-          <View style={styles.topContainer}>
-            <Text style={styles.gradientText}>
-              {type === "countup" && "Since"} {formattedCreatedAt}
-            </Text>
-            <Text style={[styles.gradientText, { fontSize: 30 }]}>
-              {name.substring(0, 20)}
+    <View style={[styles.container, { backgroundColor: s.background }]}>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={[
+          styles.content,
+          {
+            paddingTop: insets.top + spacing.md,
+            paddingBottom: insets.bottom + spacing.xl,
+          },
+        ]}
+      >
+        <View style={styles.topBar}>
+          {roundButton("arrow-left", "Back", () => router.back())}
+          {!counter.completed && (
+            <View style={styles.topActions}>
+              {Platform.OS === "android" &&
+                !counter.isArchived &&
+                roundButton(
+                  isOnWidget ? "widgets" : "widgets-outline",
+                  isOnWidget ? "Remove from widget" : "Show on widget",
+                  () => setWidgetCounterId(isOnWidget ? null : counter.id),
+                  isOnWidget
+                )}
+              {roundButton("pencil-outline", "Edit counter", () =>
+                setIsVisible(true)
+              )}
+            </View>
+          )}
+        </View>
+
+        <View style={styles.hero}>
+          <View style={styles.tagRow}>
+            <View style={[styles.dot, { backgroundColor: accent }]} />
+            <Text style={[textStyles.label, { color: s.muted }]}>
+              {counter.completed
+                ? "Completed"
+                : isCountdown
+                  ? "Counting down"
+                  : "Counting up"}
             </Text>
           </View>
-        )}
 
-        {type === "countup" || completed === "false" ? (
-          <View style={styles.timeDisplay}>
-            <View style={{ alignItems: "center" }}>
-              <Text style={[styles.timeValue, { fontSize: 70 }]}>
-                {calculated?.days}
+          {counter.completed ? (
+            <Icon source="check-circle-outline" size={120} color={s.muted} />
+          ) : (
+            <View>
+              <Text
+                style={[textStyles.number, styles.value, { color: s.text }]}
+                numberOfLines={1}
+                adjustsFontSizeToFit
+              >
+                {value}
               </Text>
-
-              <Text style={styles.timeLabel}>Days</Text>
-            </View>
-
-            <View style={{ alignItems: "center" }}>
-              <Text style={[styles.timeValue, { fontSize: 60 }]}>
-                {calculated?.hours}
+              <Text style={[textStyles.number, styles.unit, { color: s.text }]}>
+                {unit}
               </Text>
-              <Text style={styles.timeLabel}>Hours</Text>
             </View>
+          )}
 
-            <View style={{ alignItems: "center" }}>
-              <Text style={[styles.timeValue, { fontSize: 55 }]}>
-                {calculated?.minutes}
+          <View style={styles.titleBlock}>
+            <Text style={[styles.name, { color: s.text }]} numberOfLines={3}>
+              {counter.name}
+              {counter.emoji ? ` ${counter.emoji}` : ""}
+            </Text>
+            <Text style={[styles.meta, { color: s.muted }]}>
+              {dateRange(counter, now)} ·{" "}
+              {format(new Date(counter.createdAt), "h:mm a")}
+            </Text>
+            {!counter.completed && (
+              <Text style={[styles.clock, { color: s.muted }]}>
+                {hours}h {minutes}m {seconds}s{" "}
+                {isCountdown ? "on top" : "and counting"}
               </Text>
-
-              <Text style={styles.timeLabel}>Minutes</Text>
-            </View>
-
-            <View style={{ alignItems: "center" }}>
-              <Text style={[styles.timeValue, { fontSize: 50 }]}>
-                {calculated?.seconds}
-              </Text>
-
-              <Text style={styles.timeLabel}>Seconds</Text>
-            </View>
+            )}
           </View>
-        ) : (
-          <View style={[styles.timeDisplay, { justifyContent: "center" }]}>
-            <Text
-              style={[
-                styles.timeValue,
-                { fontSize: 25, textDecorationLine: "line-through" },
-              ]}
-            >
-              {name.substring(0, 20)}
-            </Text>
-            <Text style={[styles.timeValue, { fontSize: 50 }]}>Completed</Text>
-            <Text style={[styles.timeValue, { fontSize: 35 }]}>
-              {formattedCreatedAt}
-            </Text>
-            <Text style={[styles.timeValue, { fontSize: 35 }]}>
-              {formattedTime}
-            </Text>
-          </View>
-        )}
+        </View>
 
-        {type === "countup" && (
-          <>
-            <TouchableOpacity onPress={() => setIsVisible(true)}>
-              <View style={styles.btnTxtWrapper}>
-                <Icon source="pencil" size={18} color="#000" />
-                <Text style={(styles.gradientText, { fontSize: 15 })}>
-                  EDIT
-                </Text>
-              </View>
-            </TouchableOpacity>
-            <EditModal
-              type={type}
-              isVisible={isVisible}
-              onClose={() => setIsVisible(false)}
-              id={id}
-              cName={name}
-              cDate={formattedCreatedAt}
+        {showTimeline && (
+          <View
+            style={[
+              styles.card,
+              { backgroundColor: s.card, borderColor: s.border },
+            ]}
+          >
+            <Text style={[textStyles.label, { color: s.muted }]}>
+              {isCountdown ? "The wait" : "Toward the next milestone"}
+            </Text>
+            <DotGrid
+              totalDays={totalDays}
+              elapsedDays={elapsedDays}
+              color={accent}
+              emptyColor={s.track}
             />
-          </>
+            {progress && (
+              <Text style={[styles.caption, { color: s.text }]}>
+                {isCountdown
+                  ? `${Math.round(progress.fraction * 100)}% of the wait done`
+                  : progress.caption}
+              </Text>
+            )}
+          </View>
         )}
-      </SafeAreaView>
-    </LinearGradient>
+
+        {!counter.completed &&
+          (repeatLabel || reminderLabels.length > 0 || isOnWidget) && (
+            <View style={styles.badges}>
+              {repeatLabel && <Badge icon="repeat" label={repeatLabel} />}
+              {reminderLabels.map((label) => (
+                <Badge key={label} icon="bell-outline" label={label} />
+              ))}
+              {isOnWidget && <Badge icon="widgets-outline" label="On widget" />}
+            </View>
+          )}
+      </ScrollView>
+
+      {isVisible && (
+        <EditModal
+          isVisible={isVisible}
+          onClose={() => setIsVisible(false)}
+          counter={counter}
+        />
+      )}
+    </View>
   );
 }
 
@@ -238,58 +236,77 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  loadingContainer: {
-    // Added for font loading state
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    backgroundColor: "#FF96A3", // Match your gradient background for a smoother transition
+  content: {
+    paddingHorizontal: layout.gutter,
+    gap: spacing.xl,
   },
-  topContainer: {
-    justifyContent: "center",
-    alignItems: "center",
-    height: 60,
-    marginTop: 20,
-  },
-  addgradient: {
-    height: "97%",
-    width: "100%",
-    alignItems: "center",
-  },
-  gradientText: {
-    color: "black",
-    fontFamily: "bung-ee", // Example of applying a specific font
-    fontSize: 20,
-    lineHeight: 40,
-  },
-  timeDisplay: {
-    flex: 1,
-    alignItems: "center",
-    flexDirection: "column",
-    justifyContent: "center",
-    // justifyContent: "flex-start",
-  },
-
-  timeValue: {
-    fontFamily: "bung-ee", // This is where the custom font is applied
-    color: "black",
-    lineHeight: 110,
-  },
-  timeLabel: {
-    fontSize: 30,
-    color: "black",
-    textAlign: "center",
-    fontFamily: "bung-ee",
-    lineHeight: 50,
-  },
-  btnTxtWrapper: {
+  topBar: {
     flexDirection: "row",
-    justifyContent: "center",
+    justifyContent: "space-between",
     alignItems: "center",
-    minWidth: 102,
-    minHeight: 50,
-    borderRadius: 20,
-    borderWidth: 2,
-    gap: 2,
+  },
+  topActions: {
+    flexDirection: "row",
+    gap: spacing.sm,
+  },
+  roundButton: {
+    width: layout.iconButton,
+    height: layout.iconButton,
+    borderRadius: layout.iconButton / 2,
+    borderWidth: StyleSheet.hairlineWidth,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  hero: {
+    gap: spacing.md,
+  },
+  tagRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm,
+  },
+  dot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  value: {
+    fontSize: 168,
+    lineHeight: 180,
+  },
+  unit: {
+    fontSize: 64,
+    lineHeight: 70,
+  },
+  titleBlock: {
+    gap: spacing.xs,
+  },
+  name: {
+    fontSize: 24,
+    lineHeight: 30,
+    fontWeight: "700",
+  },
+  meta: {
+    fontSize: 14,
+  },
+  clock: {
+    fontSize: 14,
+    fontVariant: ["tabular-nums"],
+  },
+  card: {
+    borderRadius: radius.lg,
+    borderCurve: "continuous",
+    borderWidth: StyleSheet.hairlineWidth,
+    padding: spacing.md + spacing.xs,
+    gap: spacing.md,
+  },
+  caption: {
+    fontSize: 14,
+    fontWeight: "600",
+  },
+  badges: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: spacing.sm,
   },
 });

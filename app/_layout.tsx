@@ -1,12 +1,18 @@
+import { brand } from "@/constants/theme";
+import { Anton_400Regular, useFonts } from "@expo-google-fonts/anton";
 import { Stack, type StackCardInterpolationProps } from "expo-router/js-stack";
+import * as SplashScreen from "expo-splash-screen";
 import React, { useMemo } from "react";
 import { StatusBar } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { MD3DarkTheme, MD3LightTheme, PaperProvider } from "react-native-paper";
 
+import WidgetSync from "@/components/widget.sync";
 import { CounterProvider } from "@/context/counterContext";
-import { RevenueCatProvider } from "@/context/RevenueCatContext";
 import { ThemeProvider, useThemeContext } from "@/context/ThemeContext";
+
+// Keep the splash screen up until the font and saved counters are loaded (hidden by the home screen)
+SplashScreen.preventAutoHideAsync();
 
 // Your custom interpolator for a popping effect
 const forScale = ({ current }: StackCardInterpolationProps) => ({
@@ -38,22 +44,19 @@ function RootContent() {
 
   const theme = useMemo(() => {
     const baseTheme = themeMode === "dark" ? MD3DarkTheme : MD3LightTheme;
-    const customColors =
-      themeMode === "dark"
-        ? { primary: "#85C1E9", secondary: "#424242" }
-        : { primary: "#5DADE2", secondary: "lightgrey" };
 
     return {
       ...baseTheme,
       colors: {
         ...baseTheme.colors,
-        ...customColors,
+        ...brand[themeMode],
       },
     };
   }, [themeMode]);
 
   return (
     <PaperProvider theme={theme}>
+      <WidgetSync />
       <StatusBar
         barStyle={themeMode === "dark" ? "light-content" : "dark-content"}
       />
@@ -83,7 +86,7 @@ function RootContent() {
           }}
         />
         <Stack.Screen
-          name="subscriptions"
+          name="widget-settings"
           options={{
             headerShown: false,
             cardStyleInterpolator: forScale,
@@ -94,15 +97,26 @@ function RootContent() {
   );
 }
 
+// Deep links (e.g. a widget's "Edit widget") open on top of the home screen,
+// so back always has somewhere to go.
+export const unstable_settings = {
+  anchor: "index",
+};
+
 // Default export is what Expo Router renders for this layout
 export default function Layout() {
+  const [fontsLoaded, fontError] = useFonts({ Anton_400Regular });
+
+  // On a font error, render anyway with the system font rather than staying on the splash screen
+  if (!fontsLoaded && !fontError) {
+    return null;
+  }
+
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <ThemeProvider>
         <CounterProvider>
-          <RevenueCatProvider>
-            <RootContent />
-          </RevenueCatProvider>
+          <RootContent />
         </CounterProvider>
       </ThemeProvider>
     </GestureHandlerRootView>

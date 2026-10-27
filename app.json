@@ -42,10 +42,49 @@
         "expo-build-properties",
         {
           "android": {
-            "buildArchs": ["x86_64"]
+            "buildArchs": [
+              "x86_64"
+            ]
           }
         }
-      ]
+      ],
+      "./plugins/with-widget-configure",
+      [
+        "expo-widgets",
+        {
+          "enableAndroid": true,
+          "widgets": [
+            {
+              "name": "CounterWidget",
+              "displayName": "TimeKeeper",
+              "description": "Days left or days since for one of your counters",
+              "ios": null,
+              "android": {
+                "minWidth": 110,
+                "minHeight": 110,
+                "targetCellWidth": 2,
+                "targetCellHeight": 2,
+                "resizeMode": "none",
+                "initialLayout": "widgets/CounterWidget.tsx"
+              }
+            },
+            {
+              "name": "CounterListWidget",
+              "displayName": "TimeKeeper list",
+              "description": "All your active counters at a glance",
+              "ios": null,
+              "android": {
+                "minWidth": 250,
+                "minHeight": 180,
+                "targetCellWidth": 4,
+                "targetCellHeight": 3,
+                "initialLayout": "widgets/CounterListWidget.tsx"
+              }
+            }
+          ]
+        }
+      ],
+      "expo-background-task"
     ],
     "experiments": {
       "typedRoutes": true,
