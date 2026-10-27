@@ -2,7 +2,7 @@
   "expo": {
     "name": "TimeKeeper",
     "slug": "TimeKeeper",
-    "version": "1.0.0",
+    "version": "2.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "timekeeper",
@@ -18,7 +18,8 @@
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false,
-      "package": "com.cody669.TimeKeeper"
+      "package": "com.newArch.timekeeper",
+      "versionCode": 6
     },
     "web": {
       "output": "static",
