@@ -2,12 +2,11 @@
   "expo": {
     "name": "TimeKeeper",
     "slug": "TimeKeeper",
-    "version": "1.0.0",
+    "version": "2.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "timekeeper",
     "userInterfaceStyle": "automatic",
-    "newArchEnabled": true,
     "ios": {
       "supportsTablet": true
     },
@@ -18,35 +17,23 @@
         "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
-      "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
       "package": "com.newArch.timekeeper",
-      "softwareKeyboardLayoutMode": "pan"
+      "versionCode": 6
     },
     "web": {
       "output": "static",
-      "favicon": "./assets/images/android-icon-background.png"
+      "favicon": "./assets/images/icon.png"
     },
     "plugins": [
-      [
-        "expo-font",
-        {
-          "fonts": [
-            "./assets/fonts/roboto.ttf",
-            "./assets/fonts/myfont.ttf",
-            "./assets/fonts/bungee.ttf",
-            "./assets/fonts/boldonse.ttf"
-          ]
-        }
-      ],
       "expo-router",
       [
         "expo-splash-screen",
         {
-          "image": "./assets/images/android-icon-background.png",
+          "image": "./assets/images/splash-icon.png",
           "imageWidth": 200,
           "resizeMode": "contain",
-          "backgroundColor": "#000000",
+          "backgroundColor": "#ffffff",
           "dark": {
             "backgroundColor": "#000000"
           }
@@ -56,46 +43,53 @@
         "expo-build-properties",
         {
           "android": {
-            "compileSdkVersion": 36,
-            "targetSdkVersion": 36,
-            "buildToolsVersion": "36.0.0",
-            "buildArchs": ["x86_64"],
-            "useDayNightTheme": true
+            "buildArchs": [
+              "x86_64"
+            ]
           }
         }
       ],
+      "./plugins/with-widget-configure",
       [
-        "./plugins/withAndroidSigning",
+        "expo-widgets",
         {
-          "storeFile": "play-store-upload-key.keystore",
-          "storePassword": "***REMOVED***",
-          "keyAlias": "upload-key",
-          "keyPassword": "***REMOVED***"
-        }
-      ],
-      [
-        "react-native-android-widget",
-        {
-          "fonts": ["./assets/fonts/bungee.ttf"],
+          "enableAndroid": true,
           "widgets": [
             {
-              "name": "TimeKeeper",
-              "label": "TimeKeeper Widget",
-              "minWidth": "320dp",
-              "minHeight": "120dp",
-              "resizeMode": "horizontal|vertical",
-              "targetCellWidth": 4,
-              "targetCellHeight": 3,
-              "description": "All Counter on your home ",
-              "previewImage": "./assets/images/icon.png",
-              "updatePeriodMillis": 1800000
+              "name": "CounterWidget",
+              "displayName": "TimeKeeper",
+              "description": "Days left or days since for one of your counters",
+              "ios": null,
+              "android": {
+                "minWidth": 110,
+                "minHeight": 110,
+                "targetCellWidth": 2,
+                "targetCellHeight": 2,
+                "resizeMode": "none",
+                "initialLayout": "widgets/CounterWidget.tsx"
+              }
+            },
+            {
+              "name": "CounterListWidget",
+              "displayName": "TimeKeeper list",
+              "description": "All your active counters at a glance",
+              "ios": null,
+              "android": {
+                "minWidth": 250,
+                "minHeight": 180,
+                "targetCellWidth": 4,
+                "targetCellHeight": 3,
+                "initialLayout": "widgets/CounterListWidget.tsx"
+              }
             }
           ]
         }
-      ]
+      ],
+      "expo-background-task"
     ],
     "experiments": {
-      "typedRoutes": true
+      "typedRoutes": true,
+      "reactCompiler": true
     }
   }
 }

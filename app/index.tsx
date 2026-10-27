@@ -1,18 +1,29 @@
-import CounterItem from "@/components/CounterItem";
+import CounterCard, { CardAction } from "@/components/counter.card";
+import {
+  layout,
+  radius,
+  spacing,
+  surfaceFor,
+  textStyles,
+} from "@/constants/theme";
 import { useCounterContext } from "@/context/counterContext";
 import { useThemeContext } from "@/context/ThemeContext";
 import { Counter } from "@/types/counter";
+import { DAY_MS } from "@/utils/time";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { useFonts } from "expo-font";
+import { format } from "date-fns";
 import { useRouter } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
-  ActivityIndicator,
   Alert,
   FlatList,
+  Platform,
+  Pressable,
+  ScrollView,
   StyleSheet,
-  ToastAndroid,
+  Text,
+  useWindowDimensions,
   View,
 } from "react-native";
 import {
@@ -20,66 +31,91 @@ import {
   Gesture,
   GestureDetector,
 } from "react-native-gesture-handler";
-import { Appbar, Button, Text, useTheme } from "react-native-paper";
-import Animated, {
-  Easing,
-  runOnJS,
-  useAnimatedStyle,
-  useSharedValue,
-  withTiming,
-} from "react-native-reanimated";
-import { SafeAreaView } from "react-native-safe-area-context";
-
-// Keep splash screen visible while fonts load or data loads
-SplashScreen.preventAutoHideAsync();
-
-// --- AsyncStorage Key ---
-const STORAGE_KEY = "@days_since_app_data_v2"; // Use versioned key
+import { Icon, Snackbar, useTheme } from "react-native-paper";
+import { runOnJS } from "react-native-reanimated";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 type themeModeType = "light" | "dark" | "system";
+type Filter = "all" | "upcoming" | "since" | "archive";
 
-const BUTTON_WIDTH = 120;
-const BUTTON_GAP = 90;
-const LEFT_POSITION = 0;
-const RIGHT_POSITION = BUTTON_WIDTH + BUTTON_GAP;
-const TOP_BAR_WIDTH = BUTTON_WIDTH * 2 + BUTTON_GAP;
+const FILTERS: Filter[] = ["all", "upcoming", "since", "archive"];
+const FILTER_LABELS: Record<Filter, string> = {
+  all: "All",
+  upcoming: "Upcoming",
+  since: "Since",
+  archive: "Archive",
+};
+
+const EMPTY_STATES: Record<
+  Filter,
+  { icon: string; title: string; body: string }
+> = {
+  all: {
+    icon: "timer-sand",
+    title: "Nothing to count yet",
+    body: "Count down to something ahead, or count up from a fresh start.",
+  },
+  upcoming: {
+    icon: "calendar-clock",
+    title: "No countdowns",
+    body: "Add a trip, a birthday or a deadline.",
+  },
+  since: {
+    icon: "history",
+    title: "No count-ups",
+    body: "Track a streak or how long since something began.",
+  },
+  archive: {
+    icon: "archive-outline",
+    title: "Archive is empty",
+    body: "Finished and archived counters end up here.",
+  },
+};
 
 export default function Index() {
-  const { themeMode } = useThemeContext();
-  const { toggleTheme, setTheme } = useThemeContext();
+  const { themeMode, toggleTheme, setTheme } = useThemeContext();
   const theme = useTheme(); // Access theme colors
-  const { counters, setCounters, markCounterCompleted, deleteCounter } =
-    useCounterContext();
+  const s = surfaceFor(theme.dark);
+  const insets = useSafeAreaInsets();
+  const { width } = useWindowDimensions();
+  const router = useRouter();
+  const {
+    counters,
+    updateCounter,
+    deleteCounter,
+    markCounterCompleted,
+    widgetCounterId,
+    setWidgetCounterId,
+  } = useCounterContext();
 
-  const [isDataLoaded, setIsDataLoaded] = useState(false);
-  const [currentView, setCurrentView] = useState<"current" | "archive">(
-    "current",
-  );
+  const [filter, setFilter] = useState<Filter>("all");
+  const [now, setNow] = useState(() => Date.now());
+  const [snackbar, setSnackbar] = useState<{
+    message: string;
+    undo?: () => void;
+  } | null>(null);
 
-  const router = useRouter(); // Initialize router
+  const active = counters.filter((c) => !c.isArchived);
+  const byFilter: Record<Filter, Counter[]> = {
+    all: active,
+    upcoming: active.filter((c) => c.type === "countdown"),
+    since: active.filter((c) => c.type === "countup"),
+    archive: counters.filter((c) => c.isArchived),
+  };
+  // The soonest countdown gets the large "Up next" card
+  const hero =
+    filter === "all" || filter === "upcoming"
+      ? byFilter.upcoming
+          .filter((c) => !c.completed && c.createdAt > now)
+          .sort((a, b) => a.createdAt - b.createdAt)[0]
+      : undefined;
+  const listCounters = byFilter[filter].filter((c) => c.id !== hero?.id);
+  const tileWidth = (width - layout.gutter * 2 - layout.gap) / 2;
 
-  // Shared value for the slider's translateX position
-  const sliderTranslateX = useSharedValue(LEFT_POSITION);
-
+  // Counters (CounterProvider) are loaded once this screen mounts
   useEffect(() => {
-    if (currentView === "current") {
-      sliderTranslateX.value = withTiming(LEFT_POSITION, {
-        duration: 170,
-        easing: Easing.linear,
-      });
-    } else {
-      sliderTranslateX.value = withTiming(RIGHT_POSITION, {
-        duration: 170,
-        easing: Easing.linear,
-      });
-    }
-  }, [currentView]);
-
-  const animatedSliderStyle = useAnimatedStyle(() => {
-    return {
-      transform: [{ translateX: sliderTranslateX.value }],
-    };
-  });
+    SplashScreen.hideAsync();
+  }, []);
 
   useEffect(() => {
     const themesetter = async () => {
@@ -87,311 +123,301 @@ export default function Index() {
       if (storedTheme) setTheme(storedTheme as themeModeType);
     };
     themesetter();
-    // setDate(undefined); // Removed: Date state is now in add.modal.tsx
   }, []);
 
-  // --- Font Loading ---
-  const [loaded, error] = useFonts({
-    "Roboto-Regular": require("@/assets/fonts/roboto.ttf"),
-    "Roboto-Bold": require("@/assets/fonts/boldonse.ttf"), // Ensure this path is correct
-    "my-font": require("@/assets/fonts/myfont.ttf"),
-    "bung-ee": require("@/assets/fonts/bungee.ttf"),
-  });
-
-  // --- Load Counters from Storage ---
+  // Tick every second while any card shows hours/minutes/seconds, otherwise every minute
   useEffect(() => {
-    const loadCounters = async () => {
-      try {
-        const storedCounters = await AsyncStorage.getItem(STORAGE_KEY);
-        if (storedCounters !== null) {
-          const parsedCounters: Partial<Counter>[] = JSON.parse(storedCounters);
-          const correctedCounters: Counter[] = parsedCounters.map(
-            (c, index) => ({
-              id: c.id || `${Date.now()}-${index}`,
-              name: c.name || "Unnamed Counter",
-              createdAt: c.createdAt || Date.now(),
-              isArchived: c.isArchived === true,
-              hasNotification: c.hasNotification === true,
-              type: c.type || "countup",
-              completed: c.completed || false,
-              notificationId: c.notificationId,
-              todayNotificationId: c.todayNotificationId,
-            }),
-          );
-          setCounters(correctedCounters);
-        }
-      } catch (e) {
-        console.error("Failed to load counters.", e);
-        Alert.alert("Error", "Could not load saved counters.");
-      } finally {
-        setIsDataLoaded(true);
-      }
-    };
-    loadCounters();
-  }, []); // Empty dependency array means this runs once on mount
+    const needsSeconds = counters.some(
+      (c) => !c.isArchived && Math.abs(Date.now() - c.createdAt) < DAY_MS
+    );
+    const intervalId = setInterval(
+      () => setNow(Date.now()),
+      needsSeconds ? 1000 : 60_000
+    );
+    return () => clearInterval(intervalId);
+  }, [counters]);
 
-  // --- Hide Splash Screen ---
+  // --- Complete (or roll forward, if repeating) countdowns whose date has passed ---
   useEffect(() => {
-    if ((loaded || error) && isDataLoaded) {
-      SplashScreen.hideAsync();
-    }
-  }, [loaded, error, isDataLoaded]);
+    counters
+      .filter(
+        (c) =>
+          c.type === "countdown" &&
+          !c.completed &&
+          !c.isArchived &&
+          c.createdAt <= now
+      )
+      .forEach((c) => markCounterCompleted(c.id));
+  }, [counters, now, markCounterCompleted]);
 
-  // --- Save Counters to Storage ---
-  useEffect(() => {
-    if (!isDataLoaded) {
-      return;
-    }
-    const saveCounters = async () => {
-      try {
-        await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(counters));
-      } catch (e) {
-        console.error("Failed to save counters.", e);
-      }
-    };
-    saveCounters();
-  }, [counters, isDataLoaded]);
-
-  // helper function for setting state of view
-  const handleFlingDirection = (direction: "left" | "right") => {
-    if (direction === "right") {
-      setCurrentView("current");
-    } else if (direction === "left") {
-      setCurrentView("archive");
-    }
+  // Swipe to the next/previous filter
+  const stepFilter = (direction: 1 | -1) => {
+    setFilter((current) => {
+      const next = FILTERS.indexOf(current) + direction;
+      return FILTERS[Math.min(FILTERS.length - 1, Math.max(0, next))];
+    });
   };
 
-  // listners of gesture
   const flingRightGesture = Gesture.Fling()
     .direction(Directions.RIGHT)
     .onStart(() => {
-      runOnJS(handleFlingDirection)("right");
+      runOnJS(stepFilter)(-1);
     });
 
   const flingLeftGesture = Gesture.Fling()
     .direction(Directions.LEFT)
     .onStart(() => {
-      runOnJS(handleFlingDirection)("left");
+      runOnJS(stepFilter)(1);
     });
 
-  // --- Filtered Counters for Display ---
-  const displayedCounters = useMemo(() => {
-    return counters.filter((c) =>
-      currentView === "current" ? !c.isArchived : c.isArchived,
+  const handleAdd = () => {
+    router.push("/add.modal");
+  };
+
+  const handleDeleteCounter = (counter: Counter) => {
+    Alert.alert(
+      "Delete counter",
+      `Delete "${counter.name}"? This can't be undone.`,
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: () => deleteCounter(counter.id),
+        },
+      ]
     );
-  }, [counters, currentView]);
+  };
 
-  const handleDeleteCounter = useCallback(
-    (id: string) => {
-      const counterToDelete = counters.find((c) => c.id === id);
-      Alert.alert(
-        "Delete Counter",
-        `Are you sure you want to delete "${
-          counterToDelete?.name || "this counter"
-        }"? This cannot be undone.`,
-        [
-          { text: "Cancel", style: "cancel" },
-          {
-            text: "Delete",
-            style: "destructive",
-            onPress: () => {
-              deleteCounter(id);
-            },
-          },
-        ],
-      );
-    },
-    [counters, deleteCounter],
+  const handleArchiveToggle = (counter: Counter) => {
+    const nextIsArchived = !counter.isArchived;
+    // Archived countdowns stop sending reminders; restoring one reschedules them.
+    updateCounter(counter.id, { isArchived: nextIsArchived });
+    setSnackbar({
+      message: `"${counter.name}" ${nextIsArchived ? "archived" : "restored"}`,
+      undo: () => updateCounter(counter.id, { isArchived: !nextIsArchived }),
+    });
+  };
+
+  const actionsFor = (counter: Counter): CardAction[] => {
+    const actions: CardAction[] = [];
+    if (!counter.completed) {
+      if (Platform.OS === "android" && !counter.isArchived) {
+        const isOnWidget = widgetCounterId === counter.id;
+        actions.push({
+          title: isOnWidget ? "Remove from widget" : "Show on widget",
+          icon: isOnWidget ? "widgets" : "widgets-outline",
+          onPress: () => setWidgetCounterId(isOnWidget ? null : counter.id),
+        });
+      }
+      actions.push({
+        title: counter.isArchived ? "Restore" : "Archive",
+        icon: counter.isArchived
+          ? "archive-arrow-up-outline"
+          : "archive-outline",
+        onPress: () => handleArchiveToggle(counter),
+      });
+    }
+    actions.push({
+      title: "Delete",
+      icon: "delete-outline",
+      destructive: true,
+      onPress: () => handleDeleteCounter(counter),
+    });
+    return actions;
+  };
+
+  const openDetails = (counter: Counter) =>
+    // Details reads the rest from context, so edits show up immediately
+    router.push({ pathname: "/details", params: { id: counter.id } });
+
+  const empty = EMPTY_STATES[filter];
+
+  const headerButton = (
+    icon: string,
+    label: string,
+    onPress: () => void,
+    color: string = s.text
+  ) => (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      onPress={onPress}
+      style={({ pressed }) => [
+        styles.headerButton,
+        {
+          backgroundColor: pressed ? s.chip : "transparent",
+          borderColor: s.border,
+        },
+      ]}
+    >
+      <Icon source={icon} size={20} color={color} />
+    </Pressable>
   );
-
-  const handleArchiveToggle = useCallback(
-    (id: string) => {
-      const targetCounter = counters.find((c) => c.id === id);
-      if (!targetCounter || targetCounter.completed === true) return;
-
-      const nextIsArchived = !targetCounter.isArchived;
-      setCounters((prevCounters) =>
-        prevCounters.map((counter) =>
-          counter.id === id
-            ? { ...counter, isArchived: nextIsArchived }
-            : counter,
-        ),
-      );
-      ToastAndroid.show(
-        `"${targetCounter.name}" moved to ${
-          nextIsArchived ? "Past" : "Current"
-        }.`,
-        1000,
-      );
-    },
-    [counters, setCounters],
-  );
-
-  const handleComplete = useCallback(
-    (id: string) => {
-      const targetCounter = counters.find((c) => c.id === id);
-      if (!targetCounter) return;
-
-      markCounterCompleted(id);
-      ToastAndroid.show(`"${targetCounter.name}" moved to ${"Past"}.`, 1000);
-    },
-    [counters, markCounterCompleted],
-  );
-
-  // --- Render Item for FlatList ---
-  const renderCounterItem = useCallback(
-    ({ item }: { item: Counter }) => {
-      return (
-        <CounterItem
-          item={item}
-          handleDeleteCounter={handleDeleteCounter}
-          handleArchiveToggle={handleArchiveToggle}
-          handleComplete={handleComplete}
-        />
-      );
-    },
-    [handleDeleteCounter, handleArchiveToggle, handleComplete],
-  );
-
-  // --- Main Render ---
-  if (error) {
-    console.error("Font loading error:", error);
-    return (
-      <SafeAreaView
-        style={[
-          styles.container,
-          { backgroundColor: theme?.colors?.background || "#fff" },
-        ]}
-      >
-        <View style={styles.centeredError}>
-          <Text
-            style={{ color: theme?.colors?.error || "red", marginBottom: 10 }}
-          >
-            Error loading fonts.
-          </Text>
-          <Text style={{ color: theme?.colors?.onSurface || "#000" }}>
-            {error?.message || "Unknown error"}
-          </Text>
-        </View>
-      </SafeAreaView>
-    );
-  }
-
-  if (!loaded || !isDataLoaded) {
-    return (
-      <SafeAreaView
-        style={[
-          styles.container,
-          { backgroundColor: theme?.colors?.background || "#fff" },
-        ]}
-      >
-        <View style={styles.centeredError}>
-          <ActivityIndicator size="large" />
-        </View>
-      </SafeAreaView>
-    );
-  }
 
   return (
-    <View
-      style={[styles.container, { backgroundColor: theme.colors.background }]}
-    >
-      {/* Custom Header */}
-      <Appbar.Header
-        mode="center-aligned"
-        elevated={false}
-        style={{ backgroundColor: theme.colors.background }}
-      >
-        <Appbar.Action icon="theme-light-dark" onPress={() => toggleTheme()} />
-        <Appbar.Content title="" />
-
-        {/* <Appbar.Action
-          icon="fire-circle"
-          size={28}
-          onPress={() => {
-            router.push("/CounterWidgetPreview");
-          }}
-        /> */}
-        <Appbar.Action
-          icon="plus"
-          size={28}
-          onPress={() => {
-            // Removed direct modal state management
-            router.push("/add.modal"); // Navigate to the add.modal screen
-          }}
-        />
-      </Appbar.Header>
-
-      <View style={styles.segmentContainer}>
-        <Animated.View style={[styles.sliderBackground, animatedSliderStyle]} />
-        <Button
-          rippleColor={"#00000000"}
-          labelStyle={[
-            styles.buttonLabel,
-            {
-              fontSize: currentView === "current" ? 17 : 15,
-              fontWeight: currentView === "current" ? "bold" : "900",
-            },
-          ]}
-          onPress={() => setCurrentView("current")}
-          style={[
-            styles.topbtn,
-            styles.transparentButton,
-            // currentView === "current" && styles.selectedTab, // Removed old selected style
-          ]}
-          textColor={themeMode === "dark" ? "#fff" : "#000"}
-        >
-          Counters
-        </Button>
-
-        <Button
-          rippleColor={"#00000000"}
-          labelStyle={[
-            styles.buttonLabel,
-            {
-              fontSize: currentView === "archive" ? 17 : 15,
-              fontWeight: currentView === "archive" ? "bold" : "900",
-            },
-          ]}
-          onPress={() => setCurrentView("archive")}
-          style={[
-            // { borderColor: "#000" }, // Removed border
-            styles.topbtn,
-            styles.transparentButton,
-            // currentView === "archive" && styles.selectedTab, // Removed old selected style
-          ]}
-          textColor={themeMode === "dark" ? "#fff" : "#000"}
-        >
-          Archives
-        </Button>
+    <View style={[styles.container, { backgroundColor: s.background }]}>
+      <View style={[styles.header, { paddingTop: insets.top + spacing.md }]}>
+        <View>
+          <Text style={[styles.today, { color: s.muted }]}>
+            {format(now, "EEEE, d MMMM")}
+          </Text>
+          <Text style={[textStyles.title, { color: s.text }]}>TimeKeeper</Text>
+        </View>
+        <View style={styles.headerActions}>
+          {Platform.OS === "android" &&
+            headerButton("widgets-outline", "Widget settings", () =>
+              router.push("/widget-settings")
+            )}
+          {headerButton(
+            themeMode === "dark" ? "white-balance-sunny" : "weather-night",
+            "Toggle dark mode",
+            toggleTheme
+          )}
+        </View>
       </View>
+
+      <View>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.filters}
+        >
+          {FILTERS.map((key) => {
+            const selected = key === filter;
+            return (
+              <Pressable
+                key={key}
+                accessibilityRole="tab"
+                accessibilityState={{ selected }}
+                onPress={() => setFilter(key)}
+                style={[
+                  styles.filterChip,
+                  { backgroundColor: selected ? s.inverse : "transparent" },
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.filterText,
+                    { color: selected ? s.onInverse : s.muted },
+                  ]}
+                >
+                  {FILTER_LABELS[key]}
+                  {byFilter[key].length > 0 ? `  ${byFilter[key].length}` : ""}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </ScrollView>
+      </View>
+
       <GestureDetector
         gesture={Gesture.Simultaneous(flingRightGesture, flingLeftGesture)}
       >
         <View style={{ flex: 1 }}>
           <FlatList
-            data={displayedCounters}
-            renderItem={renderCounterItem} // No conditional rendering based on isModalVisible
+            key={filter} // reset scroll position per filter
+            data={listCounters}
             keyExtractor={(item) => item.id}
-            ListEmptyComponent={
-              <View style={styles.centered}>
-                <Text style={styles.emptyText}>
-                  No counters {currentView === "archive" ? "archived" : "yet"}.
-                </Text>
-                {currentView === "current" && !isDataLoaded && (
-                  <ActivityIndicator style={{ marginTop: 20 }} size="large" />
-                )}
-                {currentView === "current" &&
-                  isDataLoaded &&
-                  displayedCounters.length === 0 && (
-                    <Text style={styles.emptyText}>Press + to add one!</Text>
-                  )}
+            numColumns={2}
+            columnWrapperStyle={styles.gridRow}
+            showsVerticalScrollIndicator={false}
+            renderItem={({ item }) => (
+              <View style={{ width: tileWidth }}>
+                <CounterCard
+                  counter={item}
+                  now={now}
+                  variant="tile"
+                  isOnWidget={widgetCounterId === item.id}
+                  actions={actionsFor(item)}
+                  onPress={() => openDetails(item)}
+                />
               </View>
+            )}
+            contentContainerStyle={[
+              styles.listContent,
+              { paddingBottom: insets.bottom + 104 }, // room for the add button
+            ]}
+            ListHeaderComponent={
+              hero || listCounters.length > 0 ? (
+                <View style={styles.listHeader}>
+                  {hero && (
+                    <CounterCard
+                      counter={hero}
+                      now={now}
+                      variant="hero"
+                      isOnWidget={widgetCounterId === hero.id}
+                      actions={actionsFor(hero)}
+                      onPress={() => openDetails(hero)}
+                    />
+                  )}
+                  {listCounters.length > 0 && (
+                    <Text
+                      style={[
+                        textStyles.label,
+                        styles.sectionLabel,
+                        { color: s.muted },
+                      ]}
+                    >
+                      {filter === "upcoming" ? "Later" : "Your counters"}
+                    </Text>
+                  )}
+                </View>
+              ) : undefined
             }
-            contentContainerStyle={styles.listContent}
+            ListEmptyComponent={
+              hero ? undefined : (
+                <View style={styles.empty}>
+                  <View
+                    style={[
+                      styles.emptyIcon,
+                      { borderColor: s.border, backgroundColor: s.card },
+                    ]}
+                  >
+                    <Icon source={empty.icon} size={32} color={s.muted} />
+                  </View>
+                  <Text style={[styles.emptyTitle, { color: s.text }]}>
+                    {empty.title}
+                  </Text>
+                  <Text style={[styles.emptyBody, { color: s.muted }]}>
+                    {empty.body}
+                  </Text>
+                </View>
+              )
+            }
           />
         </View>
       </GestureDetector>
+
+      {filter !== "archive" && (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Add counter"
+          onPress={handleAdd}
+          style={({ pressed }) => [
+            styles.addButton,
+            {
+              backgroundColor: s.inverse,
+              bottom: insets.bottom + spacing.lg,
+              transform: [{ scale: pressed ? 0.94 : 1 }],
+            },
+          ]}
+        >
+          <Icon source="plus" size={28} color={s.onInverse} />
+        </Pressable>
+      )}
+
+      <Snackbar
+        visible={snackbar !== null}
+        onDismiss={() => setSnackbar(null)}
+        duration={4000}
+        action={
+          snackbar?.undo ? { label: "Undo", onPress: snackbar.undo } : undefined
+        }
+        wrapperStyle={{ bottom: insets.bottom }}
+      >
+        {snackbar?.message}
+      </Snackbar>
     </View>
   );
 }
@@ -401,165 +427,94 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  centered: {
-    flexGrow: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    paddingHorizontal: 20,
-    paddingBottom: 50,
-  },
-  centeredError: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    padding: 20,
-  },
-  buttonLabel: {
-    // color: "#000",
-    fontSize: 15,
-  },
-  topbtn: {
-    width: BUTTON_WIDTH,
-    padding: 5,
-    borderRadius: 30,
-    zIndex: 1,
-  },
-  transparentButton: {
-    backgroundColor: "transparent",
-  },
-  segmentContainer: {
+  header: {
     flexDirection: "row",
-    width: TOP_BAR_WIDTH, // Fixed width
-    justifyContent: "center", // Center content
+    alignItems: "flex-end",
+    justifyContent: "space-between",
+    paddingHorizontal: layout.gutter,
+    paddingBottom: spacing.lg,
+  },
+  today: {
+    fontSize: 13,
+    fontWeight: "500",
+    marginBottom: 2, // optical: tucks the date against the title
+  },
+  headerActions: {
+    flexDirection: "row",
+    gap: spacing.sm,
+  },
+  headerButton: {
+    width: layout.iconButton,
+    height: layout.iconButton,
+    borderRadius: layout.iconButton / 2,
+    borderWidth: StyleSheet.hairlineWidth,
     alignItems: "center",
-    marginBottom: 20,
-    gap: BUTTON_GAP,
-    position: "relative",
-    borderRadius: 10,
-    padding: 5,
-    alignSelf: "center", // Center the container itself
+    justifyContent: "center",
   },
-  sliderBackground: {
-    position: "absolute",
-    height: 2,
-    width: BUTTON_WIDTH - 3,
-    backgroundColor: "#4285F4", // Or any color you prefer for the slider
-    borderRadius: 30, // Match button border radius
-    left: 5, // Adjust for padding
-    top: 45, // Adjust for padding
-    elevation: 1,
-    zIndex: 0,
+  filters: {
+    paddingHorizontal: layout.gutter - spacing.md + spacing.xs, // chip text sits on the gutter
+    paddingBottom: spacing.md,
+    gap: spacing.xs,
   },
-  segmentButtons: {
-    borderRadius: 10,
+  filterChip: {
+    paddingHorizontal: spacing.md - spacing.xs,
+    paddingVertical: spacing.sm,
+    borderRadius: radius.full,
   },
-  segmentSelected: {
-    backgroundColor: "#FEC9CE",
-  },
-  segmentUnselected: {
-    backgroundColor: "transparent",
-  },
-  segmentSelectedLabel: {
-    fontFamily: "Roboto-Regular",
-    fontSize: 16,
-    color: "#333",
-    fontWeight: "600",
-  },
-  segmentUnselectedLabel: {
-    fontFamily: "Roboto-Regular",
+  filterText: {
     fontSize: 14,
-    color: "#555",
+    fontWeight: "600",
+    fontVariant: ["tabular-nums"],
   },
   listContent: {
-    paddingHorizontal: 15,
-    paddingBottom: 30,
-    paddingTop: 10,
+    paddingHorizontal: layout.gutter,
+    gap: layout.gap,
     flexGrow: 1,
   },
-  cardContainer: {
-    marginVertical: 7,
-    borderRadius: 18,
+  gridRow: {
+    gap: layout.gap,
   },
-  gradient: {
-    borderRadius: 18,
-    overflow: "hidden",
+  listHeader: {
+    gap: layout.gap,
   },
-  cardContent: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingVertical: 15,
-    paddingHorizontal: 10,
-    position: "relative",
+  sectionLabel: {
+    marginTop: spacing.md,
+    marginBottom: spacing.xs,
   },
-  leftColumn: {
+  empty: {
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
-    maxWidth: 145,
+    paddingHorizontal: spacing.xl,
+    paddingBottom: spacing.xxl,
+    gap: spacing.sm,
   },
-  rightColumn: {
-    flex: 1,
+  emptyIcon: {
+    width: 72,
+    height: 72,
+    borderRadius: radius.full,
+    borderWidth: StyleSheet.hairlineWidth,
+    alignItems: "center",
     justifyContent: "center",
-    alignItems: "baseline",
-    marginBottom: 30,
+    marginBottom: spacing.sm,
   },
-  daysNumber: {
-    fontSize: 55,
-    fontFamily: "bung-ee",
-    color: "#000",
-    lineHeight: 70,
+  emptyTitle: {
+    fontSize: 18,
+    fontWeight: "600",
     textAlign: "center",
   },
-  hoursMinutesSecondsNumber: {
-    fontSize: 55,
-    fontFamily: "bung-ee",
-    color: "#111",
-    lineHeight: 70,
-    textAlign: "center",
-  },
-  daysLabel: {
-    fontSize: 10,
-    fontFamily: "my-font",
-    color: "#333",
-    letterSpacing: 1.2,
-    fontWeight: "900",
-    marginTop: 4,
-    textTransform: "uppercase",
-    textAlign: "center",
-  },
-  dateText: {
-    fontSize: 15,
-    fontFamily: "Roboto-Regular",
-    color: "#555",
-    marginBottom: 4,
-    fontWeight: "bold",
-  },
-  nameText: {
-    fontSize: 20,
-    fontFamily: "Roboto-Regular",
-    fontWeight: "bold",
-    color: "#000",
+  emptyBody: {
+    fontSize: 14,
     lineHeight: 20,
-  },
-  notificationIcon: {
-    position: "absolute",
-    top: 5,
-    right: 35,
-    zIndex: 1,
-  },
-  deleteIcon: {
-    position: "absolute",
-    top: 5,
-    right: 5,
-    zIndex: 1,
-  },
-  emptyText: {
     textAlign: "center",
-    fontSize: 30,
-    fontFamily: "my-font",
-    color: "#777",
-    marginTop: 15,
-    lineHeight: 35,
-    fontWeight: "condensedBold",
+  },
+  addButton: {
+    position: "absolute",
+    right: layout.gutter,
+    width: 56,
+    height: 56,
+    borderRadius: radius.full,
+    alignItems: "center",
+    justifyContent: "center",
   },
 });
