@@ -43,6 +43,10 @@ const CounterListWidget = (
 ) => {
   "widget";
   const DAY_MS = 24 * 60 * 60 * 1000;
+  // Props read by our expo-widgets patch (patches/): `widgetUrl` opens a deep link on tap, and
+  // `widgetRefreshAt` on the root view is when the widget redraws next.
+  const native = (widgetUrl: string, widgetRefreshAt = 0) =>
+    ({ widgetUrl, widgetRefreshAt }) as object;
   const isDark = environment.colorScheme === "dark";
   const CARD = isDark ? "#161619" : "#FFFFFF";
   const ROW = isDark ? "#202024" : "#F6F6F4";
@@ -85,10 +89,23 @@ const CounterListWidget = (
     const range = isCountdown ? `Today → ${day}` : `${day} → Today`;
     const diff = isCountdown ? target - now : now - target;
     const days = Math.floor(Math.max(0, diff) / DAY_MS);
-    if (isCountdown && diff <= 0) return { value: "Done", unit: "", range };
-    if (days === 0) return { value: "Today", unit: "", range };
-    return { value: String(days), unit: days === 1 ? "DAY" : "DAYS", range };
+    // Same boundaries as the single counter widget: every 24h from the target, +1s
+    const refreshAt = !isCountdown
+      ? target + (days + 1) * DAY_MS + 1000
+      : diff > 0
+        ? target - days * DAY_MS + 1000
+        : 0;
+    if (isCountdown && diff <= 0) {
+      return { value: "Done", unit: "", range, refreshAt };
+    }
+    if (days === 0) return { value: "Today", unit: "", range, refreshAt };
+    const unit = days === 1 ? "DAY" : "DAYS";
+    return { value: String(days), unit, range, refreshAt };
   };
+
+  const rows = props.items.map((item) => ({ item, ...describe(item) }));
+  const upcoming = rows.map((r) => r.refreshAt).filter((t) => t > 0);
+  const refreshAt = upcoming.length > 0 ? Math.min(...upcoming) : 0;
 
   // Glance ignores `spacedBy`, so every gap below is an explicit Spacer or padding.
   return (
@@ -99,6 +116,12 @@ const CounterListWidget = (
         cornerRadius(28),
         paddingAll(12),
       ]}
+      {...native(
+        props.items.length === 0
+          ? "timekeeper://add.modal"
+          : "timekeeper:///",
+        refreshAt
+      )}
     >
       {/* Inset to line up with the row content (row padding) */}
       <Text
@@ -115,12 +138,11 @@ const CounterListWidget = (
           modifiers={[padding(12, 0, 12, 0)]}
           style={{ fontSize: 13 }}
         >
-          No active counters. Open TimeKeeper to add one.
+          No active counters. Tap to add one.
         </Text>
       ) : (
         <LazyColumn>
-          {props.items.map((item) => {
-            const { value, unit, range } = describe(item);
+          {rows.map(({ item, value, unit, range }) => {
             return (
               <Box
                 key={item.id}
@@ -134,6 +156,9 @@ const CounterListWidget = (
                     paddingAll(12),
                   ]}
                   verticalAlignment="center"
+                  {...native(
+                    `timekeeper://details?id=${encodeURIComponent(item.id)}`
+                  )}
                 >
                   <Box
                     modifiers={[

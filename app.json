@@ -49,6 +49,7 @@
           }
         }
       ],
+      "./plugins/with-android-build-fixes",
       "./plugins/with-widget-configure",
       [
         "expo-widgets",

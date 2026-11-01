@@ -71,6 +71,7 @@ export default function WidgetSync() {
     const counter = pickWidgetCounter(active, widgetCounterId);
     const props: CounterWidgetProps = {
       state: counter ? "counter" : "empty",
+      id: counter?.id ?? "",
       name: counter?.name ?? "",
       type: counter?.type ?? "countup",
       target: counter?.createdAt ?? 0,

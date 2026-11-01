@@ -50,6 +50,14 @@ export default function Details() {
     return () => clearInterval(interval);
   }, []);
 
+  // A widget can still link to a counter deleted since its last redraw: fall back to the home screen.
+  const isMissing = !counter;
+  useEffect(() => {
+    if (!isMissing) return;
+    if (router.canGoBack()) router.back();
+    else router.replace("/");
+  }, [isMissing, router]);
+
   if (!counter) {
     return null;
   }
