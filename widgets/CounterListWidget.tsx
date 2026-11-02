@@ -42,7 +42,8 @@ const CounterListWidget = (
   environment: WidgetEnvironment
 ) => {
   "widget";
-  const DAY_MS = 24 * 60 * 60 * 1000;
+  const HOUR_MS = 60 * 60 * 1000;
+  const DAY_MS = 24 * HOUR_MS;
   // Props read by our expo-widgets patch (patches/): `widgetUrl` opens a deep link on tap, and
   // `widgetRefreshAt` on the root view is when the widget redraws next.
   const native = (widgetUrl: string, widgetRefreshAt = 0) =>
@@ -89,18 +90,36 @@ const CounterListWidget = (
     const range = isCountdown ? `Today → ${day}` : `${day} → Today`;
     const diff = isCountdown ? target - now : now - target;
     const days = Math.floor(Math.max(0, diff) / DAY_MS);
-    // Same boundaries as the single counter widget: every 24h from the target, +1s
+    const hours = Math.floor(Math.max(0, diff) / HOUR_MS);
+    // Same boundaries as the single counter widget: every hour on the first/last day, every 24h
+    // otherwise, +1s. A finished countdown never changes again.
+    const step = days === 0 ? HOUR_MS : DAY_MS;
+    const steps = Math.floor(Math.max(0, diff) / step);
     const refreshAt = !isCountdown
-      ? target + (days + 1) * DAY_MS + 1000
+      ? target + (steps + 1) * step + 1000
       : diff > 0
-        ? target - days * DAY_MS + 1000
+        ? target - steps * step + 1000
         : 0;
     if (isCountdown && diff <= 0) {
       return { value: "Done", unit: "", range, refreshAt };
     }
-    if (days === 0) return { value: "Today", unit: "", range, refreshAt };
+    const direction = isCountdown ? "LEFT" : "SO FAR";
+    if (days === 0) {
+      const unit = hours <= 1 ? "HOUR" : "HOURS";
+      return {
+        value: hours === 0 ? "<1" : String(hours),
+        unit: `${unit} ${direction}`,
+        range,
+        refreshAt,
+      };
+    }
     const unit = days === 1 ? "DAY" : "DAYS";
-    return { value: String(days), unit, range, refreshAt };
+    return {
+      value: String(days),
+      unit: `${unit} ${direction}`,
+      range,
+      refreshAt,
+    };
   };
 
   const rows = props.items.map((item) => ({ item, ...describe(item) }));
@@ -168,7 +187,8 @@ const CounterListWidget = (
                     ]}
                   />
                   <Spacer modifiers={[width(12)]} />
-                  <Column modifiers={[width(60)]}>
+                  {/* Wide enough for "HOURS SO FAR" */}
+                  <Column modifiers={[width(80)]}>
                     <Text
                       color={TEXT}
                       maxLines={1}

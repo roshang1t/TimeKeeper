@@ -265,6 +265,9 @@ export default function Index() {
           <Text style={[textStyles.title, { color: s.text }]}>TimeKeeper</Text>
         </View>
         <View style={styles.headerActions}>
+          {headerButton("cloud-upload-outline", "Backup", () =>
+            router.push("/backup")
+          )}
           {Platform.OS === "android" &&
             headerButton("widgets-outline", "Widget settings", () =>
               router.push("/widget-settings")

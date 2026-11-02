@@ -58,6 +58,21 @@ export default function CounterCard({
         ? "To go"
         : "Since";
 
+  const menuButton = (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel="Counter actions"
+      hitSlop={4}
+      onPress={() => setMenuVisible(true)}
+      style={({ pressed }) => [
+        styles.menuButton,
+        pressed && { backgroundColor: s.chip },
+      ]}
+    >
+      <Icon source="dots-horizontal" size={20} color={s.muted} />
+    </Pressable>
+  );
+
   return (
     <Pressable
       onPress={onPress}
@@ -82,39 +97,33 @@ export default function CounterCard({
             <Icon source="widgets-outline" size={13} color={s.muted} />
           )}
         </View>
-        <Menu
-          visible={menuVisible}
-          onDismiss={() => setMenuVisible(false)}
-          anchor={
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Counter actions"
-              hitSlop={4}
-              onPress={() => setMenuVisible(true)}
-              style={({ pressed }) => [
-                styles.menuButton,
-                pressed && { backgroundColor: s.chip },
-              ]}
-            >
-              <Icon source="dots-horizontal" size={20} color={s.muted} />
-            </Pressable>
-          }
-        >
-          {actions.map((action) => (
-            <Menu.Item
-              key={action.title}
-              leadingIcon={action.icon}
-              title={action.title}
-              titleStyle={
-                action.destructive ? { color: theme.colors.error } : undefined
-              }
-              onPress={() => {
-                setMenuVisible(false);
-                action.onPress();
-              }}
-            />
-          ))}
-        </Menu>
+        {/* Paper fades a dismissed menu out over 250ms, and its full-screen overlay swallows
+            taps until then. Mounting the Menu only while open removes it the moment it's
+            dismissed; it still animates in, since it mounts visible. */}
+        {menuVisible ? (
+          <Menu
+            visible
+            onDismiss={() => setMenuVisible(false)}
+            anchor={menuButton}
+          >
+            {actions.map((action) => (
+              <Menu.Item
+                key={action.title}
+                leadingIcon={action.icon}
+                title={action.title}
+                titleStyle={
+                  action.destructive ? { color: theme.colors.error } : undefined
+                }
+                onPress={() => {
+                  setMenuVisible(false);
+                  action.onPress();
+                }}
+              />
+            ))}
+          </Menu>
+        ) : (
+          menuButton
+        )}
       </View>
 
       <View>

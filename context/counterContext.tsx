@@ -1,3 +1,4 @@
+import type { Backup } from "@/services/backup";
 import {
   cancelCounterNotifications,
   ensureNotificationPermission,
@@ -48,6 +49,7 @@ type CounterContextType = {
   setWidgetCounterId: (id: string | null) => void;
   listWidgetFilter: ListWidgetFilter;
   setListWidgetFilter: (filter: ListWidgetFilter) => void;
+  restoreBackup: (backup: Backup) => Promise<void>;
 };
 
 const CounterContext = createContext<CounterContextType>({
@@ -60,6 +62,7 @@ const CounterContext = createContext<CounterContextType>({
   setWidgetCounterId: () => console.warn("CounterProvider not used!"),
   listWidgetFilter: "all",
   setListWidgetFilter: () => console.warn("CounterProvider not used!"),
+  restoreBackup: async () => console.warn("CounterProvider not used!"),
 });
 
 function normalizeCounter(raw: Partial<Counter>, index: number): Counter {
@@ -291,6 +294,26 @@ export const CounterProvider = ({
     );
   }, []);
 
+  // Replaces every counter with the backup's and rebuilds the reminder schedule from them.
+  const restoreBackup = useCallback(
+    async (backup: Backup) => {
+      const restored = backup.counters.map(normalizeCounter);
+      if (
+        restored.some(
+          (c) => c.type === "countdown" && !c.completed && !c.isArchived
+        )
+      ) {
+        await ensureNotificationPermission();
+      }
+      const synced = await resyncAllNotifications(restored);
+      countersRef.current = synced;
+      setCounters(synced);
+      setWidgetCounterId(backup.widgetCounterId);
+      setListWidgetFilter(backup.listWidgetFilter);
+    },
+    [setWidgetCounterId, setListWidgetFilter]
+  );
+
   const contextValue = useMemo(
     () => ({
       counters,
@@ -302,6 +325,7 @@ export const CounterProvider = ({
       setWidgetCounterId,
       listWidgetFilter,
       setListWidgetFilter,
+      restoreBackup,
     }),
     [
       counters,
@@ -313,6 +337,7 @@ export const CounterProvider = ({
       setWidgetCounterId,
       listWidgetFilter,
       setListWidgetFilter,
+      restoreBackup,
     ]
   );
 

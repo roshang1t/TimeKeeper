@@ -92,6 +92,13 @@ function RootContent() {
             cardStyleInterpolator: forScale,
           }}
         />
+        <Stack.Screen
+          name="backup"
+          options={{
+            headerShown: false,
+            cardStyleInterpolator: forScale,
+          }}
+        />
       </Stack>
     </PaperProvider>
   );
